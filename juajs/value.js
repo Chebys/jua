@@ -9,7 +9,7 @@ class Jua_Val{
 	}
 	inheritProp(key){ //返回jua值或null
 		if(!this.proto)return null;
-		if(this.proto.isPropTrue('isClass'))
+		if(this.proto.isPropTrue('__class'))
 			return this.getOwn('super')?.getProp(key);
 		return this.proto.getProp(key);
 	}
@@ -25,7 +25,7 @@ class Jua_Val{
 	}
 	isSubclass(klass){ //不能相同
 		if(!this.proto)return false;
-		if(!this.proto.isPropTrue('isClass'))return false;
+		if(!this.proto.isPropTrue('__class'))return false;
 		let base = this.getOwn('super');
 		if(!base)return false;
 		return base == klass || base.isSubclass(klass);

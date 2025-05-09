@@ -2,7 +2,7 @@
 
 Jua_Val* Jua_Val::inheritProp(const string& key){
     if(!proto)return nullptr;
-    if(proto->isPropTrue("isClass")){
+    if(proto->isPropTrue("__class")){
         Jua_Val* super = getOwn("super");
         if(!super)return nullptr;
         return super->getProp(key);

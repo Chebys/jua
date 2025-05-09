@@ -9,7 +9,7 @@ function initBuiltins(process){
 
 function _buildClass(proto, ctor){ //ctor为Jua_Func
 	let classProto = new Jua_Obj;
-	classProto.setProp('isClass', Jua_Bool.true);
+	classProto.setProp('__class', Jua_Bool.true);
 	classProto.setProp('__call', ctor);
 	proto.proto = classProto;
 }

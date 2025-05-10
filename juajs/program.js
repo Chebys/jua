@@ -108,6 +108,7 @@ class DeclarationList extends Declarable{
 		}
 	}
 }
+
 class LiteralNum extends Expression{
 	static eval(str){
 		return new this(eval(str));
@@ -148,6 +149,7 @@ class Template extends Expression{
 		return new Jua_Str(strlist.join(''));
 	}
 }
+
 class Keyword extends Expression{
 	constructor(str){
 		super();
@@ -194,6 +196,7 @@ class Varname extends Expression{ //Declarable
 	}
 	addDefault(){} //dummy
 }
+
 class OptionalPropRef extends Expression{ //LeftValue
 	constructor(expr, prop){
 		//prop为js字符串
@@ -245,21 +248,62 @@ class MethWrapper extends Expression{
 		});
 	}
 }
+class Subscription extends BinaryExpr{ //LeftValue
+	constructor(expr, key){
+		super('subscript', expr, key);
+	}
+	calc(env){
+		let obj = this.left.calc(env);
+		let key = this.right.calc(env);
+		return env.trackExpr(this, ()=>obj.getItem(key));
+	}
+	assign(env, val){
+		let obj = this.left.calc(env);
+		let key = this.right.calc(env);
+		obj.setItem(key, val||Jua_Null.inst);
+	}
+}
+class Call extends Expression{
+	constructor(callee, args){
+		super();
+		this.callee = callee;
+		this.args = args;
+		//todo: starred
+	}
+	setSource(...args){
+		super.setSource(...args);
+		this.callee.copySrc(this);
+		//args 在 parseExpr 时已 setSource
+	}
+	calc(env){
+		let fn = this.callee.calc(env);
+		let args = this.args.map(expr=>expr.calc(env));
+		return env.trackExpr(this, ()=>fn.call(args));
+	}
+}
+class OptionalMethCall extends Call{ //暂未启用
+	constructor(expr, method, args){
+		let callee = new MethWrapper(expr, method);
+		super(callee, args);
+		this.expr = expr;
+	}
+}
+
 class UnitaryExpr extends Expression{
 	constructor(type, expr){
 		super();
 		this.type = type;
 		this.expr = expr;
+		this.operator = uniOperator[this.type];
+		if(!this.operator)throw new JuaSyntaxError('no operator: '+type);
 	}
 	setSource(...args){
 		super.setSource(...args);
 		this.expr.copySrc(this);
 	}
 	calc(env){
-		let operator = uniOperator[this.type];
-		if(!operator)throw new JuaSyntaxError('no operator: '+this.type);
 		let val = this.expr.calc(env);
-		return env.trackExpr(this, ()=>operator(val));
+		return env.trackExpr(this, ()=>this.operator(val));
 	}
 }
 class BinaryExpr extends Expression{
@@ -320,21 +364,7 @@ class Assignment extends Expression{
 		}
 	}
 }
-class Subscription extends BinaryExpr{ //LeftValue
-	constructor(expr, key){
-		super('subscript', expr, key);
-	}
-	calc(env){
-		let obj = this.left.calc(env);
-		let key = this.right.calc(env);
-		return env.trackExpr(this, ()=>obj.getItem(key));
-	}
-	assign(env, val){
-		let obj = this.left.calc(env);
-		let key = this.right.calc(env);
-		obj.setItem(key, val||Jua_Null.inst);
-	}
-}
+
 class TernaryExpr extends Expression{ //if(cond) v1 else v2
 	constructor(cond, expr, elseExpr){
 		super();
@@ -358,24 +388,7 @@ class TernaryExpr extends Expression{ //if(cond) v1 else v2
 class FlexibleList{
 	//todo
 }
-class Call extends Expression{
-	constructor(callee, args){
-		super();
-		this.callee = callee;
-		this.args = args;
-		//todo: starred
-	}
-	setSource(...args){
-		super.setSource(...args);
-		this.callee.copySrc(this);
-		//args 在 parseExpr 时已 setSource
-	}
-	calc(env){
-		let fn = this.callee.calc(env);
-		let args = this.args.map(expr=>expr.calc(env));
-		return env.trackExpr(this, ()=>fn.call(args));
-	}
-}
+
 class ObjExpr extends Expression{
 	constructor(entries){
 		super();

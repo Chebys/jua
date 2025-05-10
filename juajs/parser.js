@@ -104,6 +104,14 @@ class TokensReader{ //抽象类
 		if(token.str!=str)
 			throw new JuaSyntaxError(`Unexpected token: '${token.str}'; Expect '${str}'`);
 	}
+	skipStr(str){
+		let token = this.preview();
+		if(token?.str == str){
+			this.read();
+			return true;
+		}
+		return false;
+	}
 	end(){
 		return !this.preview();
 	}
@@ -153,7 +161,7 @@ class ScriptReader extends TokensReader{
 		if(symchars.has(c)){
 			return this.readSymbol(c);
 		}else if(validIdStartReg.test(c)){
-			return new Token('word', c + this.match(/[_a-zA-Z0-9]*/y));
+			return new Token('word', c + this.match(/\w*/y));
 		}else if(/[0-9]/.test(c)){
 			return new Token('literal_num', this.readNum(c));
 		}else if(c=="'"){
@@ -367,19 +375,23 @@ function parseStatement(reader){
 			case 'return':{
 				reader.read();
 				let expr = parseExpr(reader); //todo: 省略返回值
+				reader.skipStr(';');
 				return new Return(expr);
 			}
 			case 'break':{
 				reader.read();
+				reader.skipStr(';');
 				return new Break;
 			}
 			case 'continue':{
 				reader.read();
+				reader.skipStr(';');
 				return new Continue;
 			}
 			case 'let':{
 				reader.read();
 				let list = parseDecList(reader);
+				reader.skipStr(';');
 				return new Declaration(list);
 			}
 			case 'fun':{
@@ -393,7 +405,7 @@ function parseStatement(reader){
 			}
 			case 'if':{
 				reader.read();
-				let cond = parseClosedExpr(reader);
+				let cond = parseCond(reader);
 				let block = parseBlockOrStatement(reader);
 				let elseBlock;
 				if(reader.previewStr() == 'else'){
@@ -432,7 +444,7 @@ function parseStatement(reader){
 			}
 			case 'while':{
 				reader.read();
-				let cond = parseClosedExpr(reader);
+				let cond = parseCond(reader);
 				let block = parseBlockOrStatement(reader);
 				return new WhileStatement(cond, block);
 			}
@@ -443,7 +455,21 @@ function parseStatement(reader){
 		}
 	//表达式语句
 	let expr = parseExpr(reader);
+	reader.skipStr(';');
 	return new ExprStatement(expr);
+}
+function parseCond(reader){
+	let head = reader.read();
+	let expr;
+	if(head.type=='()'){
+		expr = parseExpr(head.reader);
+		head.reader.assetEnd();
+	}else if(head.str=='!'){
+		expr =  new UnitaryExpr('!', parseClosedExpr(reader));
+	}else{
+		throw new JuaSyntaxError('Unexpected token: '+head);
+	}
+	return expr;
 }
 function parseForStmt(reader){
 	//从 (...) 开始读取
@@ -564,7 +590,7 @@ function parsePrimary(reader){ //初等表达式，可以是一元运算符+初�
 			}else if(str == 'null'){
 				return parsePrimaryTail(Keyword.null, reader);
 			}else if(str == 'if'){
-				let cond = parseClosedExpr(reader);
+				let cond = parseCond(reader);
 				let expr = parseExpr(reader);
 				if(reader.readStr()!='else')throw new JuaSyntaxError("Missing 'else'");
 				let elseExpr = parseExpr(reader);
@@ -675,7 +701,7 @@ function parsePrimaryTail(head, reader){
 			let expr = new Call(head, [func]);
 			return parsePrimaryTail(expr, reader);
 		}
-		case 'sq_str':
+		case 'sq_str': case 'dq_str': case 'bq_str':
 			return new Call(head, [parseExpr(reader)]);
 		default:
 			return head;

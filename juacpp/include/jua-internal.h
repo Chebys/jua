@@ -31,6 +31,8 @@ struct Jua_Val{
     Jua_Obj* proto;
     size_t ref = 0;
     Jua_Val(JuaType t, Jua_Obj* p = nullptr): type(t), proto(p){}
+    void addRef(){ ref++; }
+    void release();
     virtual Jua_Val* getOwn(const string& key){
         return nullptr;
     }
@@ -75,9 +77,7 @@ struct Jua_Val{
         throw "type error";
     }
     virtual string getTypeName() = 0;
-    virtual void gc(){
-        if(!ref)delete this;
-    }
+    virtual void gc();
 };
 
 struct Jua_Null: Jua_Val{
@@ -93,7 +93,8 @@ struct Jua_Null: Jua_Val{
 };
 struct Jua_Obj: Jua_Val{
     std::unordered_map<string, Jua_Val*> dict;
-    Jua_Obj(Jua_Obj* p = nullptr): Jua_Val(Obj, p){}
+    Jua_Obj(Jua_Obj* p = nullptr);
+    ~Jua_Obj();
     bool hasOwn(Jua_Val* key);
     Jua_Val* getOwn(size_t hash, const string& key); //todo
     Jua_Val* getOwn(const string& key){
@@ -104,12 +105,8 @@ struct Jua_Obj: Jua_Val{
         string str(key);
         return getOwn(str);
     }
-    void setProp(const string& key, Jua_Val* val){
-        dict[key] = val;
-    }
-    void delProp(const string& key){
-        dict.erase(key);
-    }
+    void setProp(const string& key, Jua_Val* val);
+    void delProp(const string& key);
     Jua_Bool* hasItem(Jua_Val* key);
     Jua_Val* getItem(Jua_Val* key);
     void setItem(Jua_Val* key, Jua_Val* val);
@@ -164,13 +161,13 @@ struct Jua_Str: Jua_Val{
 };
 struct Jua_Func: Jua_Val{
     Jua_Func(): Jua_Val(Func){};
-    string toString(){ return "#function"; }
+    string toString(){ return "<function>"; }
     string getTypeName(){ return "function"; }
 };
 
 struct Scope: Jua_Obj{
     Scope* parent;
-    Scope(Scope* p=nullptr): parent(p){}
+    Scope(Scope* p=nullptr): parent(p){ if(p)p->addRef(); }
     Jua_Val* inheritProp(const string&) override;
 };
 struct Jua_NativeFunc: Jua_Func{
@@ -183,7 +180,7 @@ struct Jua_NativeFunc: Jua_Func{
 };
 struct Jua_Array: Jua_Obj{
     jualist items;
-    Jua_Array(jualist& list): items(list){}
+    Jua_Array(const jualist& list): items(list){}
     Jua_Val* getItem(Jua_Val*);
     void setItem(Jua_Val*, Jua_Val*);
 };
@@ -241,7 +238,7 @@ struct DeclarationList{
     DeclarationList(std::deque<DeclarationItem*> items): decItems(items){}
     void assign(Scope* env, Jua_Val* val);
     void declare(Scope* env, Jua_Val* val);
-    void rawDeclare(Scope* env, jualist);
+    void rawDeclare(Scope* env, const jualist&);
 };
 struct LiteralNum: Expression{
     double value;
@@ -254,7 +251,12 @@ struct LiteralStr: Expression{
     LiteralStr(string v): value(v){}
     Jua_Val* calc(Scope*);
 };
-struct Template;
+struct Template: Expression{
+    std::vector<string> strList;
+    std::vector<Expression*> exprList;
+    Template(std::vector<string>& sl, std::vector<Expression*> el): strList(sl), exprList(el){}
+	Jua_Val* calc(Scope*);
+};
 struct Keyword: Expression{
     char type;
     Keyword(char t): type(t){};
@@ -292,10 +294,23 @@ struct Call: Expression{
     Jua_Val* calc(Scope*);
 };
 
+struct ObjExpr: Expression{
+    typedef std::vector<std::pair<Expression*, Expression*>> Props;
+    Props entries;
+	ObjExpr(Props p): entries(p){}
+	Jua_Val* calc(Scope*);
+};
+struct ArrayExpr: Expression{
+    FlexibleList* list;
+    ArrayExpr(FlexibleList* exprs): list(exprs){}
+	Jua_Val* calc(Scope*);
+};
+
 struct Controller{
     bool isPending = false;
     Jua_Val* retval = nullptr;
 };
+
 struct Statement{
     Statement* pending_continue = nullptr;
     Statement* pending_break = nullptr;
@@ -316,32 +331,27 @@ struct Declaration: Statement{
         }
         list = l;
     }
-    void exec(Scope* env){
+    void exec(Scope* env, Controller*){
         list->rawDeclare(env, {});
     }
 };
+struct Return: Statement{
+    Expression* expr;
+    Return(Expression* e=nullptr): expr(e){}
+    void exec(Scope*, Controller*);
+};
+
+typedef std::vector<Statement*> Stmts;
 
 struct Block{
     Statement* pending_continue = nullptr;
     Statement* pending_break = nullptr;
-    std::vector<Statement*> statements;
-    Block(std::vector<Statement*> stmts): statements(stmts){
-        for(auto stmt: stmts){
-            if(!pending_continue)
-                pending_continue = stmt->pending_continue;
-            if(!pending_break)
-                pending_break = stmt->pending_break;
-        }
-    }
-    void exec(Scope* env, Controller* controller){ //env是新产生的作用域
-		for(auto stmt: statements)
-			if(controller->isPending)break;
-			else stmt->exec(env, controller);
-		//todo: 垃圾回收
-	}
+    Stmts statements;
+    Block(Stmts stmts);
+    void exec(Scope* env, Controller* controller);
 };
 struct FunctionBody: Block{
-    FunctionBody(std::vector<Statement*> stmts): Block(stmts){
+    FunctionBody(Stmts stmts): Block(stmts){
         if(pending_continue)
             throw pending_continue;
         if(pending_break)
@@ -350,22 +360,43 @@ struct FunctionBody: Block{
     Jua_Val* exec(Scope*);
 };
 
+struct Jua_PFunc: Jua_Func{
+    Scope* upenv;
+    DeclarationList* decList;
+    FunctionBody* body;
+    Jua_PFunc(Scope* env, DeclarationList* list, FunctionBody* b):
+        upenv(env), decList(list), body(b){}
+	Jua_Val* call(jualist& args){
+		auto env = new Scope(upenv);
+		decList->rawDeclare(env, args);
+		return body->exec(env);
+	}
+};
+
+struct FunExpr: Expression{
+    DeclarationList* decList;
+    FunctionBody* body;
+	FunExpr(DeclarationList* dl, Stmts stmts):
+        decList(dl), body(new FunctionBody(stmts)){}
+	Jua_Val* calc(Scope* env){
+		return new Jua_PFunc(env, decList, body);
+	}
+};
+
 FunctionBody* parse(const string&);
 
 struct JuaVM{
-    const string script;
     std::unordered_map<string, Jua_Val*> modules;
     Scope* _G;
-    JuaVM(); //无主模块
-    JuaVM(const string&); //提供主模块代码
-    void run(); //运行主模块
-    Jua_Val* eval(const string&);
-    
+    JuaVM();
+    void run(const string&);
+    Jua_Val* eval(const string&); //不捕获错误
+
     protected:
     virtual void initBuiltins();
     virtual void makeGlobal();
     virtual string findModule(const string& name) = 0;
-    virtual void j_stdout(jualist&){};
+    virtual void j_stdout(const jualist&){};
     virtual void j_stderr(JuaError*){};
 
     private:

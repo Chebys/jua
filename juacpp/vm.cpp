@@ -1,12 +1,11 @@
 #include "jua-internal.h"
-JuaVM::JuaVM(): JuaVM(string()){}
-JuaVM::JuaVM(const string& s): script(s){
+
+JuaVM::JuaVM(){
     initBuiltins();
-    _G = new Scope;
     makeGlobal();
 }
 
-void JuaVM::run(){
+void JuaVM::run(const string& script){
     try{
         auto val = eval(script);
         val->gc();
@@ -17,14 +16,18 @@ void JuaVM::run(){
 
 Jua_Val* JuaVM::eval(const string& script){
     //返回非空指针，可能需要垃圾回收
+    //d_log("eval");
+    //d_log(script);
     auto body = parse(script);
     return body->exec(new Scope(_G));
 }
 void JuaVM::initBuiltins(){
-    //pass
+
 }
 void JuaVM::makeGlobal(){
-    _G->ref++;
+    _G = new Scope;
+    _G->addRef();
+    _G->setProp("_G", _G);
     auto print = [this](jualist& args){
         j_stdout(args);
         return Jua_Null::getInst();

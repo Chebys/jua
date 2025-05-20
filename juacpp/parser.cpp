@@ -78,6 +78,23 @@ static bool initSym(){
 namespace JuaParser{
     static bool _ = initSym();
 }
+bool validWordStart(char c){
+    return 'a'<=c && c<='z' || 'A'<=c && c<='Z' || c=='_';
+}
+
+string missing(char c){
+    if(c=='\'')return "Missing \"'\"";
+    string msg = "Missing '";
+    msg.push_back(c);
+    msg.push_back('\'');
+    return msg;
+}
+string unexpected(string str){
+    string msg = "Unexpected \"";
+    msg.append(str);
+    msg.push_back('"');
+    return msg;
+}
 
 struct Token{
     enum Type{SEP, UNIOP, BINOP, WORD, NUM, STR, DQ_STR, PAREN, BRAKET, BRACE};
@@ -114,12 +131,20 @@ struct TokensReader{
 		if(token->str != str)
 			throw "Unexpected token";
     }
+    bool skipStr(const string& str){
+        auto token = preview();
+        if(token && token->str==str){
+            read();
+            return true;
+        }
+        return false;
+    }
     bool end(){
         return !preview();
     }
-    bool assetEnd(){
+    void assetEnd(){
         auto token = preview();
-        if(token)throw "Unexpected token";
+        if(token)throw unexpected(token->str);
     }
 };
 
@@ -142,7 +167,12 @@ struct Enclosure: Token{
     ListReader reader;
     Enclosure(Type t, std::vector<Token*> list): Token(t, "<Enclosure>"), reader(list){}
 };
-struct StrTmpl;
+struct StrTmpl: Token{
+    std::vector<string> strList;
+    std::vector<Token*> tokenList;
+	StrTmpl(std::vector<string> sl, std::vector<Token*> tl):
+        Token(DQ_STR, "<StrTmpl>"), strList(sl), tokenList(tl){}
+};
 
 std::unordered_map<char, char> escape_map{
     {'a', '\a'}, {'b', '\b'}, {'f', '\f'},
@@ -194,7 +224,7 @@ struct ScriptReader: TokensReader{
         while(skipWhite());
         //todo
     }
-    string readWord(char start){
+    Token* readWord(char start){
         string word(1, start);
         while(!eof()){
             char c = script[pos];
@@ -205,7 +235,7 @@ struct ScriptReader: TokensReader{
                 break;
             }
         }
-        return word;
+        return new Token(Token::WORD, word);
     }
     bool readSimpleNum(string& start){
         //仅含0-9
@@ -226,8 +256,11 @@ struct ScriptReader: TokensReader{
             num.push_back('x');
             forward();
             while(!eof()){
-                char next = readChar();
-                if('0'<=next&&next<='9'||'a'<=next&&next<='f'||'A'<=next&&next<='F')num.push_back(next);
+                char next = script[pos];
+                if('0'<=next&&next<='9'||'a'<=next&&next<='f'||'A'<=next&&next<='F'){
+                    forward();
+                    num.push_back(next);
+                }
                 else break;
             }
             return num;
@@ -235,11 +268,13 @@ struct ScriptReader: TokensReader{
         if(readSimpleNum(num))return num;
         //此时非eof
         if(script[pos]=='.'){
+            num.push_back('.');
             forward();
             if(readSimpleNum(num))return num;
         }
         //此时非eof
         if(script[pos]=='e'){
+            num.push_back('e');
             forward();
             char next = readChar();
             if(next=='-' || '0'<=next || next<='9')num.push_back(next);
@@ -249,10 +284,11 @@ struct ScriptReader: TokensReader{
         return num;
     }
     std::vector<Token*> readUntil(char end){
+        //d_log("<Enclosure start>");
         std::vector<Token*> list;
         while(true){
             skipVoid();
-            if(eof())throw "Missing end";
+            if(eof())throw missing(end);
             if(script[pos]==end){
                 forward(); //假设 end 不是 newline
                 return list;
@@ -281,6 +317,15 @@ struct ScriptReader: TokensReader{
         str.resize(1);
         return Token::symbol(str);
     }
+    char escape(bool allow_newline=false){
+        //从 `\` 后开始读取
+        char c = readChar();
+        if(c=='x' || c=='u')throw "todo: \\x";
+        else if('0'<=c && c<='9')throw "todo: \\0";
+        else if(c=='\n' && !allow_newline)throw "cannot wrap inside SQ string";
+        else if(escape_map.contains(c))return escape_map[c];
+        return c;
+    }
     string readSQStr(){
         //从单引号之后开始读取
 		//返回实际值
@@ -288,20 +333,13 @@ struct ScriptReader: TokensReader{
         while(true){
             char c = readChar();
             if(c=='\'')return value;
-            if(c=='\\'){
-                char next = readChar();
-                if(next=='x' || next=='u')throw "todo: \\x";
-                else if('0'<=next && next<='9')throw "todo: \\0";
-                else if(next=='\n')throw "cannot wrap inside SQ string";
-                else if(escape_map.contains(next))value.push_back(escape_map[next]);
-                else value.push_back(next);
-            }else if(c=='\n')throw "cannot wrap inside SQ string";
+            if(c=='\\')value.push_back(escape());
+            else if(c=='\n')throw "cannot wrap inside SQ string";
             else value.push_back(c);
         }
     }
-    Token* readStrTmpl(){
-        throw "todo: readStrTmpl";
-    }
+    Token* readStrTmpl();
+    std::pair<string, Token*> readDQStr();
     string readBQStr(){
         //从反引号之后开始读取
 		//返回实际值
@@ -333,8 +371,8 @@ Token* ScriptReader::doRead(){
     char c = readChar();
     if(symchars.test(c))
         return readSymbol(c);
-    else if('a'<=c && c<='z' || 'A'<=c && c<='Z' || c=='_')
-        return new Token(Token::WORD, readWord(c));
+    else if(validWordStart(c))
+        return readWord(c);
     else if('0'<=c && c<='9')
         return new Token(Token::NUM, readNum(c));
     else if(c=='\'')
@@ -346,11 +384,59 @@ Token* ScriptReader::doRead(){
         throw "todo: doRead";
     }
 }
+Token* ScriptReader::readStrTmpl(){
+    std::vector<string> slist;
+    std::vector<Token*> tlist;
+    while(true){
+        auto pair = readDQStr();
+        slist.push_back(pair.first);
+        if(pair.second)
+            tlist.push_back(pair.second);
+        else
+            return new StrTmpl(slist, tlist);
+    }
+}
+std::pair<string, Token*> ScriptReader::readDQStr(){
+    string str;
+    while(true){
+        char c = readChar();
+        if(c=='"')return {str, nullptr};
+        if(c=='$'){
+            char next = readChar();
+            if(next=='{'){
+                auto tl = readUntil('}');
+                return {str, new Enclosure(Token::BRACE, tl)};
+            }
+            if(validWordStart(next)){
+                return {str, readWord(next)};
+            }
+            throw "Invalid char";
+        }
+        if(c=='\\')str.push_back(escape(true));
+        else str.push_back(c);
+    }
+}
+
+Expression* parsePrimaryTail(Expression*, TokensReader&);
+Expression* parseExpr(TokensReader&);
+Expression* parseFunc(TokensReader& reader);
+Expression* parseObj(TokensReader& reader);
+Stmts parseStatements(TokensReader& reader);
 
 
-Expression* parsePrimaryTail(Expression*, TokensReader*);
-Expression* parseExpr(TokensReader* reader){
-    auto start = reader->read();
+FlexibleList* parseFlexExprList(TokensReader& reader){
+    //可空，可尾随逗号，读完 reader
+    //todo: *
+    std::vector<Expression*> exprs;
+    while(true){
+        if(reader.end())return new FlexibleList(exprs);
+        exprs.push_back(parseExpr(reader));
+        if(reader.end())return new FlexibleList(exprs);
+        reader.assetStr(",");
+    }
+}
+Expression* parsePrimary(TokensReader& reader){
+    auto start = reader.read();
     switch (start->type){
     case Token::WORD:{
         if(start->isValidVarname)
@@ -363,7 +449,11 @@ Expression* parseExpr(TokensReader* reader){
             return parsePrimaryTail(Keyword::f, reader);
         if(start->str=="local")
             return parsePrimaryTail(Keyword::local, reader);
-        throw start->str;
+        if(start->str=="fun"){
+            auto func = parseFunc(reader);
+            return parsePrimaryTail(func, reader);
+        }
+        throw unexpected(start->str);
     }
     case Token::NUM:{
         return parsePrimaryTail(LiteralNum::eval(start->str), reader);
@@ -371,20 +461,58 @@ Expression* parseExpr(TokensReader* reader){
     case Token::STR:{
         return parsePrimaryTail(new LiteralStr(start->str), reader);
     }
-    
+    case Token::DQ_STR:{
+        auto dqstr = static_cast<StrTmpl*>(start);
+        std::vector<Expression*> exprs;
+        for(auto token: dqstr->tokenList){
+            if(token->isValidVarname){
+                exprs.push_back(new Varname(token->str));
+            }else if(token->type==Token::BRACE){
+                auto cl = static_cast<Enclosure*>(token);
+                exprs.push_back(parseExpr(cl->reader));
+                cl->reader.assetEnd();
+            }
+        }
+        return new Template(dqstr->strList, exprs);
+    }
+    case Token::PAREN:{
+        auto cl = static_cast<Enclosure*>(start);
+        auto expr = parseExpr(cl->reader);
+        cl->reader.assetEnd();
+        return parsePrimaryTail(expr, reader);
+    }
+    case Token::BRACE:{
+        auto cl = static_cast<Enclosure*>(start);
+        auto expr = parseObj(cl->reader);
+        return parsePrimaryTail(expr, reader);
+    }
+    case Token::BRAKET:{
+        auto cl = static_cast<Enclosure*>(start);
+        ArrayExpr* arr;
+        if(cl->reader.end())
+            arr = new ArrayExpr({});
+        else{
+            auto list = parseFlexExprList(cl->reader);
+            cl->reader.assetEnd();
+            arr = new ArrayExpr(list);
+        }
+        return parsePrimaryTail(arr, reader);
+    }
+    case Token::UNIOP:{
+        throw "todo: UNIOP";
+    }
     default:
-        throw "???";
-        break;
+        throw unexpected(start->str);
     }
 }
-Expression* parsePrimaryTail(Expression* start, TokensReader* reader){
-    auto next = reader->preview();
+Expression* parsePrimaryTail(Expression* start, TokensReader& reader){
+    auto next = reader.preview();
     if(!next)return start;
     switch (next->type){
         case Token::PAREN:{
-            reader->read();
+            reader.read();
             auto cl = static_cast<Enclosure*>(next);
-            auto arg = parseExpr(&cl->reader);
+            auto arg = parseExpr(cl->reader);
             //todo
             auto args = new FlexibleList({arg});
             auto call = new Call(start, args);
@@ -394,20 +522,146 @@ Expression* parsePrimaryTail(Expression* start, TokensReader* reader){
             return start;
     }
 }
-Statement* parseStatement(TokensReader* reader){
+Expression* parseExpr(TokensReader& reader){
+    return parsePrimary(reader);
+}
+
+std::pair<Expression*, Expression*> parseProp(TokensReader& reader){
+    Expression *key, *val;
+	auto start = reader.read();
+	if(start->type==Token::WORD){
+		key = new LiteralStr(start->str);
+		auto next = reader.preview();
+		if(next && next->str=="="){
+			reader.read();
+			val = parseExpr(reader);
+		}else if(next && next->type==Token::PAREN){
+			val = parseFunc(reader);
+		}else if(start->isValidVarname){
+			val = new Varname(start->str);
+		}else{
+			throw "Invalid Varname";
+		}
+	}else if(start->type==Token::BRAKET){
+        auto cl = static_cast<Enclosure*>(start);
+		key = parseExpr(cl->reader);
+		cl->reader.assetEnd();
+		auto next = reader.preview();
+		if(!next)
+			throw "Unfinished input";
+		if(next->str=="="){
+			reader.read();
+			val = parseExpr(reader);
+		}else if(next->type==Token::PAREN){
+			val = parseFunc(reader);
+		}else{
+			throw unexpected(next->str);
+		}
+	}
+	return {key, val};
+}
+Expression* parseObj(TokensReader& reader){
+    //读完 reader
+	ObjExpr::Props entries;
+	while(true){
+		//此时刚开始读取或读完上一个逗号
+		if(reader.end()){ //允许尾随逗号
+			return new ObjExpr(entries);
+		}
+		entries.push_back(parseProp(reader));
+		if(reader.end())
+			return new ObjExpr(entries);
+		reader.assetStr(",");
+	}
+}
+Expression* parseFunc(TokensReader& reader){
+    //从 Enclosure 开始读取
+	auto _args = reader.read();
+	if(_args->type != Token::PAREN)
+		throw missing('(');
+    auto args = static_cast<Enclosure*>(_args);
+	DeclarationList* decList;
+	if(args->reader.end()){
+		decList = new DeclarationList({});
+	}else{
+        throw "todo: parseFlexDecList";
+		//decList = parseFlexDecList(args.reader);
+		args->reader.assetEnd();
+	}
+	Stmts stmts;
+	auto next = reader.read();
+	if(next->type == Token::BRACE){
+        auto cl = static_cast<Enclosure*>(next);
+		stmts = parseStatements(cl->reader);
+	}else if(next->str == "="){
+		auto expr = parseExpr(reader);
+        throw "todo: fun()=0";
+		//stmts = Stmts(new Return(expr));
+	}else{
+		throw unexpected(next->str);
+	}
+	return new FunExpr(decList, stmts);
+}
+
+Declarable* parseDeclarable(TokensReader& reader){
+    auto next = reader.read();
+    if(next->isValidVarname)return new Varname(next->str);
+    throw "todo: parseDeclarable";
+}
+DeclarationItem* parseDecItem(TokensReader& reader){
+    Declarable* declarable = parseDeclarable(reader);
+	Expression* defval = nullptr;
+	bool auto_null = false;
+	string next = reader.previewStr();
+	if(next=="?"){
+		reader.read();
+		auto_null = true;
+	}else if(next=="="){
+		reader.read();
+		defval = parseExpr(reader);
+	}
+	DeclarationItem* item = new DeclarationItem(declarable, defval); //todo: src
+	if(auto_null)item->addDefault();
+	return item;
+}
+DeclarationList* parseDecList(TokensReader& reader){
+    std::deque<DeclarationItem*> items;
+    while(true){
+		items.push_back(parseDecItem(reader));
+		if(reader.previewStr()==",")
+			reader.read();
+		else
+			return new DeclarationList(items);
+	}
+}
+
+Statement* parseStatement(TokensReader& reader){
     //若为空语句或读完，则返回 nullptr
-    auto start = reader->preview();
+    auto start = reader.preview();
     if(!start || start->str==";")return nullptr;
     if(start->isKeyword){
-        throw "todo: parseStatement";
+        if(start->str=="return"){
+            reader.read();
+            if(reader.skipStr(";"))return new Return;
+            auto expr = parseExpr(reader);
+            reader.skipStr(";");
+            return new Return(expr);
+        }
+        if(start->str=="let"){
+            reader.read();
+            auto list = parseDecList(reader);
+            reader.skipStr(";");
+            return new Declaration(list);
+        }
+        throw unexpected(start->str);
     }
     auto expr =  parseExpr(reader);
     return new ExprStatement(expr);
 }
-std::vector<Statement*> parseStatements(TokensReader* reader){
-    std::vector<Statement*> stmts;
+Stmts parseStatements(TokensReader& reader){
+    Stmts stmts;
     while(true){
-        if(reader->end())return stmts;
+        if(reader.end())return stmts;
         auto stmt = parseStatement(reader);
         if(stmt)stmts.push_back(stmt);
     }
@@ -415,6 +669,6 @@ std::vector<Statement*> parseStatements(TokensReader* reader){
 
 FunctionBody* parse(const string& script){
     ScriptReader reader(script);
-    auto stmts = parseStatements(&reader);
+    auto stmts = parseStatements(reader);
     return new FunctionBody(stmts);
 }

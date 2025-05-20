@@ -13,18 +13,26 @@ void SetConsoleToUTF8() {
 }
 
 struct JuaRuntime: JuaVM{
-    using JuaVM::JuaVM;
-    JuaRuntime(const char* name): JuaVM(findModule(name)){} //提供主模块名称
-    std::string findModule(const std::string& name)override{
-        fs::path fp = name+".jua";
+    const char* main; //主模块名称
+    fs::path cwd;
+    JuaRuntime(const char* name, fs::path _cwd=fs::current_path()): main(name), cwd(_cwd){}
+    void run(){
+        JuaVM::run(findModule(main));
+    }
+    std::string findModule(const std::string& name){
+        fs::path fp = cwd/(name+".jua");
         std::fstream file(fp, std::ios_base::in);
+        if(!file.is_open()){
+            std::string err = "未找到模块：";
+            throw err+name;
+        }
         size_t len = fs::file_size(fp);
         string script(len, '\0');
         file.read(&script[0], len);
         //cout<<script<<'\n';
         return script;
     }
-    void j_stdout(jualist& vals){
+    void j_stdout(const jualist& vals){
         cout << "j_stdout: ";
         size_t len = vals.size();
         if(!len)cout << '\n';

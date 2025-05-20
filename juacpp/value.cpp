@@ -1,5 +1,10 @@
 #include "jua-internal.h"
 
+
+void Jua_Val::release(){
+    ref--;
+    gc();
+}
 Jua_Val* Jua_Val::inheritProp(const string& key){
     if(!proto)return nullptr;
     if(proto->isPropTrue("__class")){
@@ -90,6 +95,28 @@ Jua_Bool* Jua_Val::toJuaBool(){
     return Jua_Bool::getInst(toBoolean());
 }
 
+void Jua_Val::gc(){
+    if(!ref){
+        d_log("gc()");
+        delete this;
+    }
+}
+
+Jua_Obj::Jua_Obj(Jua_Obj* p): Jua_Val(Obj, p){ if(p)p->addRef(); }
+Jua_Obj::~Jua_Obj(){ if(proto)proto->release(); }
+void Jua_Obj::setProp(const string& key, Jua_Val* val){
+    if(dict.contains(key)){
+        dict[key]->release();
+    }
+    dict[key] = val;
+    val->addRef();
+}
+void Jua_Obj::delProp(const string& key){
+    if(dict.contains(key)){
+        dict[key]->release();
+        dict.erase(key);
+    }
+}
 Jua_Bool* Jua_Obj::hasItem(Jua_Val* key){
     auto fn = getMetaMethod("hasItem");
     if(fn)return fn->call({this, key})->toJuaBool();
@@ -138,7 +165,7 @@ string Jua_Obj::safeToString(){
     return str;
 }
 bool Jua_Obj::isPropTrue(const char* key){
-    throw "todo";
+    throw "todo: Jua_Obj::isPropTrue";
 }
 
 Jua_Val* Jua_Num::add(Jua_Val* val){
@@ -174,7 +201,7 @@ Jua_Bool* Jua_Num::le(Jua_Val* val){
 Jua_Val* Jua_Num::range(Jua_Val* val){
     if(val->type!=Num)throw "type error";
     auto num = static_cast<Jua_Num*>(val);
-    throw "todo";
+    throw "todo: Jua_Num::range";
 }
 bool Jua_Num::operator==(Jua_Val* val){
     if(!val || val->type!=Num)
@@ -206,7 +233,7 @@ bool Jua_Str::operator==(Jua_Val* val){
 }
 
 Jua_Val* Scope::inheritProp(const string& key){
-    if(parent)return parent->getProp(key);
+    if(parent)return parent->getProp(key); //指针可能已经失效？？？
     return nullptr;
 }
 

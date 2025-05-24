@@ -1,4 +1,5 @@
-#include "jua-internal.h"
+#include "jua-vm.h"
+#include "jua-syntax.h"
 
 JuaVM::JuaVM(){
     initBuiltins();

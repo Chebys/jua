@@ -1,5 +1,5 @@
-#include "jua-internal.h"
-
+#include "jua-value.h"
+#include <charconv>
 
 void Jua_Val::release(){
     ref--;
@@ -97,7 +97,7 @@ Jua_Bool* Jua_Val::toJuaBool(){
 
 void Jua_Val::gc(){
     if(!ref){
-        d_log("gc()");
+        //d_log("gc()");
         delete this;
     }
 }
@@ -209,7 +209,9 @@ bool Jua_Num::operator==(Jua_Val* val){
     return value == static_cast<Jua_Num*>(val)->value;
 }
 string Jua_Num::toString(){
-    return std::to_string(value); //todo: 去除尾随0
+    char s[32];
+    auto res = std::to_chars(s, s+32, value);
+    return {s, res.ptr};
 }
 
 size_t correctIndex(Jua_Val* num, size_t len){

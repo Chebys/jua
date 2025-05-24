@@ -1,5 +1,4 @@
-#include "jua-internal.h"
-//#include "operators.h"
+#include "jua-syntax.h"
 #include <bitset>
 #include <unordered_set>
 using std::string;
@@ -95,6 +94,13 @@ string unexpected(string str){
     msg.push_back('"');
     return msg;
 }
+string unexpected(string une, string e){
+    string msg = unexpected(une);
+    msg.append("; Expect \"");
+    msg.append(e);
+    msg.push_back('"');
+    return msg;
+}
 
 struct Token{
     enum Type{SEP, UNIOP, BINOP, WORD, NUM, STR, DQ_STR, PAREN, BRAKET, BRACE};
@@ -129,7 +135,7 @@ struct TokensReader{
     void assetStr(const string& str){
         auto token = read();
 		if(token->str != str)
-			throw "Unexpected token";
+			throw unexpected(token->str, str);
     }
     bool skipStr(const string& str){
         auto token = preview();
@@ -417,17 +423,17 @@ std::pair<string, Token*> ScriptReader::readDQStr(){
     }
 }
 
-Expression* parsePrimaryTail(Expression*, TokensReader&);
-Expression* parseExpr(TokensReader&);
-Expression* parseFunc(TokensReader& reader);
-Expression* parseObj(TokensReader& reader);
+Expr* parsePrimaryTail(Expr*, TokensReader&);
+Expr* parseExpr(TokensReader&);
+Expr* parseFunc(TokensReader& reader);
+Expr* parseObj(TokensReader& reader);
 Stmts parseStatements(TokensReader& reader);
 
 
 FlexibleList* parseFlexExprList(TokensReader& reader){
     //可空，可尾随逗号，读完 reader
     //todo: *
-    std::vector<Expression*> exprs;
+    std::vector<Expr*> exprs;
     while(true){
         if(reader.end())return new FlexibleList(exprs);
         exprs.push_back(parseExpr(reader));
@@ -435,7 +441,7 @@ FlexibleList* parseFlexExprList(TokensReader& reader){
         reader.assetStr(",");
     }
 }
-Expression* parsePrimary(TokensReader& reader){
+Expr* parsePrimary(TokensReader& reader){
     auto start = reader.read();
     switch (start->type){
     case Token::WORD:{
@@ -463,7 +469,7 @@ Expression* parsePrimary(TokensReader& reader){
     }
     case Token::DQ_STR:{
         auto dqstr = static_cast<StrTmpl*>(start);
-        std::vector<Expression*> exprs;
+        std::vector<Expr*> exprs;
         for(auto token: dqstr->tokenList){
             if(token->isValidVarname){
                 exprs.push_back(new Varname(token->str));
@@ -505,29 +511,63 @@ Expression* parsePrimary(TokensReader& reader){
         throw unexpected(start->str);
     }
 }
-Expression* parsePrimaryTail(Expression* start, TokensReader& reader){
+Expr* parsePrimaryTail(Expr* start, TokensReader& reader){
     auto next = reader.preview();
     if(!next)return start;
     switch (next->type){
+        case Token::SEP:
+            if(next->str=="."){ //属性引用
+                reader.read();
+                auto id = reader.read();
+                if(id->type!=Token::WORD)throw "expect property name";
+                auto expr = new PropRef(start, id->str);
+                return parsePrimaryTail(expr, reader);
+            }else if(next->str=="?."){
+                reader.read();
+                auto id = reader.read();
+                if(id->type!=Token::WORD)throw "expect property name";
+                auto expr = new OptionalPropRef(start, id->str);
+                return parsePrimaryTail(expr, reader);
+            }else if(next->str==":"){ //方法包装
+                throw "todo: 方法包装";
+            }
+            return start;
         case Token::PAREN:{
             reader.read();
             auto cl = static_cast<Enclosure*>(next);
-            auto arg = parseExpr(cl->reader);
-            //todo
-            auto args = new FlexibleList({arg});
+            auto args = parseFlexExprList(cl->reader);
             auto call = new Call(start, args);
             return parsePrimaryTail(call, reader);
+        }
+        case Token::BRAKET:{
+            reader.read();
+            auto cl = static_cast<Enclosure*>(next);
+			auto key = parseExpr(cl->reader);
+			cl->reader.assetEnd();
+			auto expr = new Subscription(start, key);
+			return parsePrimaryTail(expr, reader);
         }
         default:
             return start;
     }
 }
-Expression* parseExpr(TokensReader& reader){
-    return parsePrimary(reader);
+Expr* parseExpr(TokensReader& reader){
+    //todo
+    auto start = parsePrimary(reader);
+    auto next = reader.preview();
+    if(!next)return start;
+    if(next->isBinop){
+        throw "todo: binop";
+    }else if(next->str == "="){
+        reader.read();
+        throw "todo: Assignment";
+        //return new Assignment();
+    }
+    return start;
 }
 
-std::pair<Expression*, Expression*> parseProp(TokensReader& reader){
-    Expression *key, *val;
+std::pair<Expr*, Expr*> parseProp(TokensReader& reader){
+    Expr *key, *val;
 	auto start = reader.read();
 	if(start->type==Token::WORD){
 		key = new LiteralStr(start->str);
@@ -560,7 +600,7 @@ std::pair<Expression*, Expression*> parseProp(TokensReader& reader){
 	}
 	return {key, val};
 }
-Expression* parseObj(TokensReader& reader){
+Expr* parseObj(TokensReader& reader){
     //读完 reader
 	ObjExpr::Props entries;
 	while(true){
@@ -574,7 +614,7 @@ Expression* parseObj(TokensReader& reader){
 		reader.assetStr(",");
 	}
 }
-Expression* parseFunc(TokensReader& reader){
+Expr* parseFunc(TokensReader& reader){
     //从 Enclosure 开始读取
 	auto _args = reader.read();
 	if(_args->type != Token::PAREN)
@@ -610,7 +650,7 @@ Declarable* parseDeclarable(TokensReader& reader){
 }
 DeclarationItem* parseDecItem(TokensReader& reader){
     Declarable* declarable = parseDeclarable(reader);
-	Expression* defval = nullptr;
+	Expr* defval = nullptr;
 	bool auto_null = false;
 	string next = reader.previewStr();
 	if(next=="?"){

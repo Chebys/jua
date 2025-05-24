@@ -1,4 +1,4 @@
-#include "jua-internal.h"
+#include "jua-syntax.h"
 
 Jua_Val* LiteralStr::calc(Scope*){
     return new Jua_Str(value);
@@ -68,14 +68,44 @@ void DeclarationItem::declare(Scope* env, Jua_Val* val){
 void DeclarationList::rawDeclare(Scope* env, const jualist& vals){
     for(size_t i=0; i<decItems.size(); i++){
         auto item = decItems[i];
-        auto val = i<vals.size() ? vals[i] : nullptr;
-        if(val || item->initval)
-            item->declare(env, val);
+        if(i < vals.size())
+            item->declare(env, vals[i]);
+        else if(item->initval)
+            item->declare(env, nullptr);
         else
             throw "Missing argument";
     }
 }
 
+Jua_Val* OptionalPropRef::_calc(Scope* env){
+    return expr->calc(env)->getProp(prop);
+}
+Jua_Val* OptionalPropRef::calc(Scope* env){
+    auto val = _calc(env);
+    if(val)return val;
+    return Jua_Null::getInst();
+}
+Jua_Val* PropRef::calc(Scope* env){
+    auto val = _calc(env);
+    if(val)return val;
+    throw "no property";
+}
+void PropRef::assign(Scope* env, Jua_Val* val){
+    auto tar = expr->calc(env);
+    if(tar->type != Jua_Val::Obj)throw "not an object";
+    auto obj = static_cast<Jua_Obj*>(tar);
+    obj->setProp(prop, val);
+}
+Jua_Val* Subscription::calc(Scope* env){
+    auto obj = expr->calc(env);
+    auto key = keyExpr->calc(env);
+    return obj->getItem(key);
+}
+void Subscription::assign(Scope* env, Jua_Val* val){
+    auto obj = expr->calc(env);
+    auto key = keyExpr->calc(env);
+    obj->setItem(key, val);
+}
 
 Jua_Val* Call::calc(Scope* env){
     //d_log("Call");
@@ -96,6 +126,11 @@ Jua_Val* ObjExpr::calc(Scope* env){
         obj->setProp(key->toString(), val);
     }
     return obj;
+}
+
+Jua_Val* BinaryExpr::calc(Scope* env){
+    auto lv = left->calc(env), rv = right->calc(env);
+    return operate(oper, lv, rv);
 }
 
 void Return::exec(Scope* env, Controller* ctrl){

@@ -1,7 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <filesystem>
-#include "jua-internal.h"
+#include "jua-vm.h"
 
 namespace fs = std::filesystem;
 using std::cout;
@@ -53,7 +53,7 @@ int main(){
         SetConsoleToUTF8();
         cout << "构造 JuaRuntime\n";
         JuaRuntime RT("test");
-        cout << "构造 JuaRuntime 完毕\n";
+        cout << "JuaVM::run\n";
         RT.run();
         cout << "JuaVM::run 完毕\n";
     }catch(JuaError* err){

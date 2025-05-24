@@ -1,4 +1,4 @@
-#include "jua-internal.h"
+#include "jua-value.h"
 #include <iostream>
 
 void d_log(const string& msg){
@@ -13,4 +13,9 @@ void d_log(Jua_Val* val){
 void d_log(string msg, Jua_Val* val){
     msg.append(val->safeToString());
     d_log(msg);
+}
+void d_log(string label, int num){
+    label.append(": ");
+    label.append(std::to_string(num));
+    d_log(label);
 }

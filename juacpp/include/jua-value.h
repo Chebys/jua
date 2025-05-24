@@ -1,3 +1,4 @@
+#pragma once
 #include <string>
 #include <deque>
 #include <vector>
@@ -14,6 +15,7 @@ static_assert(
 );
 using std::string;
 using std::initializer_list;
+
 struct Jua_Val;
 struct Jua_Obj;
 struct Jua_Bool;
@@ -24,6 +26,7 @@ void d_log(const string&);
 void d_log(char c);
 void d_log(Jua_Val*);
 void d_log(string, Jua_Val*);
+void d_log(string, int);
 
 struct Jua_Val{
     enum JuaType{Obj, Null, Str, Num, Bool, Func};
@@ -212,193 +215,4 @@ struct JuaErrorWithVal: JuaError{
         str.append(val ? val->safeToString() : "nullptr");
         return str;
     }
-};
-
-struct Expression{
-    virtual Jua_Val* calc(Scope* env) = 0;
-};
-struct LeftValue{
-    virtual void assign(Scope* env, Jua_Val* val) = 0;
-};
-struct Declarable: LeftValue{
-    virtual void declare(Scope* env, Jua_Val* val) = 0;
-    virtual void addDefault(){}
-};
-struct DeclarationItem{
-    Declarable* body;
-    Expression* initval;
-    DeclarationItem(Declarable* d, Expression* e=nullptr): body(d), initval(e){}
-    void addDefault();
-    void assign(Scope* env, Jua_Val* val);
-    void declare(Scope* env, Jua_Val* val);
-};
-struct DeclarationList{
-    //static DeclarationList* fromNames()
-    std::deque<DeclarationItem*> decItems;
-    DeclarationList(std::deque<DeclarationItem*> items): decItems(items){}
-    void assign(Scope* env, Jua_Val* val);
-    void declare(Scope* env, Jua_Val* val);
-    void rawDeclare(Scope* env, const jualist&);
-};
-struct LiteralNum: Expression{
-    double value;
-    LiteralNum(double v): value(v){}
-    static LiteralNum* eval(const string& str);
-    Jua_Val* calc(Scope*);
-};
-struct LiteralStr: Expression{
-    string value;
-    LiteralStr(string v): value(v){}
-    Jua_Val* calc(Scope*);
-};
-struct Template: Expression{
-    std::vector<string> strList;
-    std::vector<Expression*> exprList;
-    Template(std::vector<string>& sl, std::vector<Expression*> el): strList(sl), exprList(el){}
-	Jua_Val* calc(Scope*);
-};
-struct Keyword: Expression{
-    char type;
-    Keyword(char t): type(t){};
-    Jua_Val* calc(Scope*);
-    static Keyword* null;
-    static Keyword* t;
-    static Keyword* f;
-    static Keyword* local;
-};
-struct Varname: Expression, Declarable{
-    string str;
-    //size_t hash; todo
-    Varname(string name): str(name){};
-    Jua_Val* calc(Scope*);
-    void assign(Scope* env, Jua_Val* val);
-    void declare(Scope* env, Jua_Val* val);
-};
-struct PropRef;
-struct MethWrapper;
-struct UnitaryExpr;
-struct BinaryExpr;
-struct Assignment;
-struct Subscription;
-struct TernaryExpr;
-struct FlexibleList{
-    std::vector<Expression*> exprs;
-    FlexibleList(std::vector<Expression*>& list): exprs(list){};
-    FlexibleList(initializer_list<Expression*> list): exprs(list){};
-    jualist calc(Scope*);
-};
-struct Call: Expression{
-    Expression* calee;
-    FlexibleList* args;
-    Call(Expression* e, FlexibleList* l): calee(e), args(l){}
-    Jua_Val* calc(Scope*);
-};
-
-struct ObjExpr: Expression{
-    typedef std::vector<std::pair<Expression*, Expression*>> Props;
-    Props entries;
-	ObjExpr(Props p): entries(p){}
-	Jua_Val* calc(Scope*);
-};
-struct ArrayExpr: Expression{
-    FlexibleList* list;
-    ArrayExpr(FlexibleList* exprs): list(exprs){}
-	Jua_Val* calc(Scope*);
-};
-
-struct Controller{
-    bool isPending = false;
-    Jua_Val* retval = nullptr;
-};
-
-struct Statement{
-    Statement* pending_continue = nullptr;
-    Statement* pending_break = nullptr;
-    virtual void exec(Scope*, Controller*) = 0;
-};
-struct ExprStatement: Statement{
-    Expression* expr;
-    ExprStatement(Expression* e): expr(e){}
-    void exec(Scope* env, Controller*){
-        expr->calc(env);
-    }
-};
-struct Declaration: Statement{
-    DeclarationList* list;
-    Declaration(DeclarationList* l){
-        for(auto item: l->decItems){
-            if(!item->initval)item->initval = Keyword::null;
-        }
-        list = l;
-    }
-    void exec(Scope* env, Controller*){
-        list->rawDeclare(env, {});
-    }
-};
-struct Return: Statement{
-    Expression* expr;
-    Return(Expression* e=nullptr): expr(e){}
-    void exec(Scope*, Controller*);
-};
-
-typedef std::vector<Statement*> Stmts;
-
-struct Block{
-    Statement* pending_continue = nullptr;
-    Statement* pending_break = nullptr;
-    Stmts statements;
-    Block(Stmts stmts);
-    void exec(Scope* env, Controller* controller);
-};
-struct FunctionBody: Block{
-    FunctionBody(Stmts stmts): Block(stmts){
-        if(pending_continue)
-            throw pending_continue;
-        if(pending_break)
-            throw pending_break;
-    }
-    Jua_Val* exec(Scope*);
-};
-
-struct Jua_PFunc: Jua_Func{
-    Scope* upenv;
-    DeclarationList* decList;
-    FunctionBody* body;
-    Jua_PFunc(Scope* env, DeclarationList* list, FunctionBody* b):
-        upenv(env), decList(list), body(b){}
-	Jua_Val* call(jualist& args){
-		auto env = new Scope(upenv);
-		decList->rawDeclare(env, args);
-		return body->exec(env);
-	}
-};
-
-struct FunExpr: Expression{
-    DeclarationList* decList;
-    FunctionBody* body;
-	FunExpr(DeclarationList* dl, Stmts stmts):
-        decList(dl), body(new FunctionBody(stmts)){}
-	Jua_Val* calc(Scope* env){
-		return new Jua_PFunc(env, decList, body);
-	}
-};
-
-FunctionBody* parse(const string&);
-
-struct JuaVM{
-    std::unordered_map<string, Jua_Val*> modules;
-    Scope* _G;
-    JuaVM();
-    void run(const string&);
-    Jua_Val* eval(const string&); //不捕获错误
-
-    protected:
-    virtual void initBuiltins();
-    virtual void makeGlobal();
-    virtual string findModule(const string& name) = 0;
-    virtual void j_stdout(const jualist&){};
-    virtual void j_stderr(JuaError*){};
-
-    private:
-    Jua_Val* require(const string& name);
 };

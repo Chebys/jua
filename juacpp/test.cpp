@@ -48,11 +48,17 @@ struct JuaRuntime: JuaVM{
     }
 };
 
-int main(){
+int main(int argc, char* argv[]){
+    //第一个参数指定模块名（不含jua后缀），默认 "main"
     try{
+        char* main_module;
+        if(argc>1)
+            main_module = argv[1];
+        else
+            main_module = "main";
         SetConsoleToUTF8();
         cout << "构造 JuaRuntime\n";
-        JuaRuntime RT("test");
+        JuaRuntime RT(main_module);
         cout << "JuaVM::run\n";
         RT.run();
         cout << "JuaVM::run 完毕\n";

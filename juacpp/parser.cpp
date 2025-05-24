@@ -110,10 +110,9 @@ struct Token{
     bool isBinop;
     bool isValidVarname;
     Token(Type t, const string& s): type(t), str(s){
-        //todo
         //d_log(s);
         isKeyword = keywords.contains(s);
-        isBinop = false;
+        isBinop = binOpers.contains(s);
         isValidVarname = type==WORD && !isKeyword;
     }
     static Token* symbol(const string& s){
@@ -429,7 +428,6 @@ Expr* parseFunc(TokensReader& reader);
 Expr* parseObj(TokensReader& reader);
 Stmts parseStatements(TokensReader& reader);
 
-
 FlexibleList* parseFlexExprList(TokensReader& reader){
     //可空，可尾随逗号，读完 reader
     //todo: *
@@ -557,7 +555,9 @@ Expr* parseExpr(TokensReader& reader){
     auto next = reader.preview();
     if(!next)return start;
     if(next->isBinop){
-        throw "todo: binop";
+        reader.read();
+        //todo: 优先级
+        return new BinaryExpr(binOpers[next->str], start, parseExpr(reader));
     }else if(next->str == "="){
         reader.read();
         throw "todo: Assignment";

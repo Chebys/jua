@@ -48,6 +48,11 @@ Jua_Val* Jua_Val::call(jualist& args){
     return fn->call(args);
     
 }
+Jua_Val* Jua_Val::unm(){
+    Jua_Func* fn = getMetaMethod("__unm");
+    if(fn)return fn->call({this});
+    throw "type err";
+}
 Jua_Val* Jua_Val::add(Jua_Val* val){
     Jua_Func* fn = getMetaMethod("__add");
     if(fn)return fn->call({this, val});
@@ -168,6 +173,9 @@ bool Jua_Obj::isPropTrue(const char* key){
     throw "todo: Jua_Obj::isPropTrue";
 }
 
+Jua_Val* Jua_Num::unm(){
+    return new Jua_Num(-value);
+}
 Jua_Val* Jua_Num::add(Jua_Val* val){
     if(val->type!=Num)throw "type error";
     auto num = static_cast<Jua_Num*>(val);

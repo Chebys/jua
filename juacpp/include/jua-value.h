@@ -1,4 +1,5 @@
 #pragma once
+#define JUA_DEBUG
 #include <string>
 #include <deque>
 #include <vector>
@@ -63,6 +64,7 @@ struct Jua_Val{
         jualist list = args;
         return call(list);
     }
+    virtual Jua_Val* unm();
     virtual Jua_Val* add(Jua_Val*);
     virtual Jua_Val* sub(Jua_Val*);
     virtual Jua_Val* mul(Jua_Val*);
@@ -84,7 +86,6 @@ struct Jua_Val{
 };
 
 struct Jua_Null: Jua_Val{
-    Jua_Null(): Jua_Val(Null){}
     string toString(){ return "null"; }
     bool toBoolean(){ return false; }
     string getTypeName(){ return "null"; }
@@ -93,6 +94,8 @@ struct Jua_Null: Jua_Val{
         static Jua_Null* inst = new Jua_Null;
         return inst;
     }
+    private:
+    Jua_Null(): Jua_Val(Null){}
 };
 struct Jua_Obj: Jua_Val{
     std::unordered_map<string, Jua_Val*> dict;
@@ -121,23 +124,24 @@ struct Jua_Obj: Jua_Val{
 };
 struct Jua_Bool: Jua_Val{
     bool value;
-    Jua_Bool(bool v): Jua_Val(Bool), value(v){};
     string toString(){
         return value ? "true" : "false";
     }
     bool toBoolean(){ return value; }
     string getTypeName(){ return "boolean"; }
     void gc(){}
-    static Jua_Bool* inst[2];
     static Jua_Bool* getInst(bool v){
         static Jua_Bool* t = new Jua_Bool(true);
         static Jua_Bool* f = new Jua_Bool(false);
         return v ? t : f;
     }
+    private:
+    Jua_Bool(bool v): Jua_Val(Bool), value(v){};
 };
 struct Jua_Num: Jua_Val{
     double value;
     Jua_Num(double v): Jua_Val(Num), value(v){};
+    Jua_Val* unm();
     Jua_Val* add(Jua_Val*);
     Jua_Val* sub(Jua_Val*);
     Jua_Val* mul(Jua_Val*);

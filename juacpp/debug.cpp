@@ -2,10 +2,12 @@
 #include <iostream>
 
 void d_log(const string& msg){
+    #ifdef JUA_DEBUG
     std::cout << msg << '\n';
+    #endif
 }
 void d_log(char c){
-    std::cout << c << '\n';
+    d_log(string(1, c));
 }
 void d_log(Jua_Val* val){
     d_log(val->safeToString());

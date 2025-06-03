@@ -128,6 +128,10 @@ Jua_Val* ObjExpr::calc(Scope* env){
     return obj;
 }
 
+Jua_Val* UnitaryExpr::calc(Scope* env){
+    auto val = pri->calc(env);
+    return operate(oper, val);
+}
 Jua_Val* BinaryExpr::calc(Scope* env){
     auto lv = left->calc(env), rv = right->calc(env);
     return operate(oper, lv, rv);

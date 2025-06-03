@@ -68,10 +68,10 @@ static void regSymStr(const string& str){
 static bool initSym(){
     for(string str: seprators)
         regSymStr(str);
-    /*for(string str: uniOperator)
-        regSymStr(str);
-    for(string str: binOperator)
-        regSymStr(str);*/
+    for(auto oper: uniOpers)
+        regSymStr(oper.first);
+    for(auto oper: binOpers)
+        regSymStr(oper.first);
     return true;
 }
 namespace JuaParser{
@@ -116,8 +116,11 @@ struct Token{
         isValidVarname = type==WORD && !isKeyword;
     }
     static Token* symbol(const string& s){
-        //todo
-        return new Token(SEP, s);
+        Type t;
+        if(binOpers.contains(s))t = BINOP;
+        else if(uniOpers.contains(s))t = UNIOP;
+        else t = SEP;
+        return new Token(t, s);
     }
 };
 struct TokensReader{

@@ -74,7 +74,12 @@ struct PropRef: OptionalPropRef, LeftValue{
 	void assign(Scope* env, Jua_Val* val);
 };
 struct MethWrapper;
-struct UnitaryExpr;
+struct UnitaryExpr: Expr{
+    UniOper oper;
+    Expr* pri;
+    UnitaryExpr(UniOper type, Expr* expr): oper(type), pri(expr){}
+    Jua_Val* calc(Scope* env);
+};
 struct BinaryExpr: Expr{
     BinOper oper;
     Expr* left;

@@ -117,8 +117,8 @@ struct Token{
     }
     static Token* symbol(const string& s){
         Type t;
-        if(binOpers.contains(s))t = BINOP;
-        else if(uniOpers.contains(s))t = UNIOP;
+        if(uniOpers.contains(s))t = UNIOP;
+        else if(binOpers.contains(s))t = BINOP;
         else t = SEP;
         return new Token(t, s);
     }
@@ -430,7 +430,58 @@ Expr* parseExpr(TokensReader&);
 Expr* parseFunc(TokensReader& reader);
 Expr* parseObj(TokensReader& reader);
 Stmts parseStatements(TokensReader& reader);
+Block* parseBlockOrStatement(TokensReader& reader);
+Declarable* parseDeclarable(TokensReader& reader){
+    auto next = reader.read();
+    if(next->isValidVarname)return new Varname(next->str);
+    throw "todo: parseDeclarable";
+}
+DeclarationItem* parseDecItem(TokensReader& reader){
+    Declarable* declarable = parseDeclarable(reader);
+	Expr* defval = nullptr;
+	bool auto_null = false;
+	string next = reader.previewStr();
+	if(next=="?"){
+		reader.read();
+		auto_null = true;
+	}else if(next=="="){
+		reader.read();
+		defval = parseExpr(reader);
+	}
+	DeclarationItem* item = new DeclarationItem(declarable, defval); //todo: src
+	if(auto_null)item->addDefault();
+	return item;
+}
+DeclarationList* parseDecList(TokensReader& reader){
+    std::deque<DeclarationItem*> items;
+    while(true){
+		items.push_back(parseDecItem(reader));
+		if(reader.previewStr()==",")
+			reader.read();
+		else
+			return new DeclarationList(items);
+	}
+}
+DeclarationList* parseFlexDecList(TokensReader& reader){
+    //可空，可尾随逗号，读完 reader
+    std::deque<DeclarationItem*> items;
+    while(true){
+        if(reader.end())return new DeclarationList(items);
+        items.push_back(parseDecItem(reader));
+        if(reader.end())return new DeclarationList(items);
+        reader.assetStr(",");
+    }
+}
 
+Expr* parseCond(TokensReader& reader){
+    //todo: if !(...)
+    auto head = reader.read();
+    if(head->type!=Token::PAREN)throw unexpected(head->str, "(...)");
+    auto cl = static_cast<Enclosure*>(head);
+    auto cond = parseExpr(cl->reader);
+    cl->reader.assetEnd();
+    return cond;
+}
 FlexibleList* parseFlexExprList(TokensReader& reader){
     //可空，可尾随逗号，读完 reader
     //todo: *
@@ -459,6 +510,13 @@ Expr* parsePrimary(TokensReader& reader){
         if(start->str=="fun"){
             auto func = parseFunc(reader);
             return parsePrimaryTail(func, reader);
+        }
+        if(start->str=="if"){
+            auto cond = parseCond(reader);
+            auto expr = parseExpr(reader);
+            reader.assetStr("else");
+            auto elseExpr = parseExpr(reader);
+            return new TernaryExpr(cond, expr, elseExpr);
         }
         throw unexpected(start->str);
     }
@@ -506,7 +564,7 @@ Expr* parsePrimary(TokensReader& reader){
         return parsePrimaryTail(arr, reader);
     }
     case Token::UNIOP:{
-        throw "todo: UNIOP";
+        return new UnitaryExpr(uniOpers[start->str], parsePrimary(reader));
     }
     default:
         throw unexpected(start->str);
@@ -530,7 +588,11 @@ Expr* parsePrimaryTail(Expr* start, TokensReader& reader){
                 auto expr = new OptionalPropRef(start, id->str);
                 return parsePrimaryTail(expr, reader);
             }else if(next->str==":"){ //方法包装
-                throw "todo: 方法包装";
+                reader.read();
+                auto name = reader.read();
+                if(name->type!=Token::WORD)throw "expect method name";
+                auto wrapper = new MethWrapper(start, name->str);
+                return parsePrimaryTail(wrapper, reader);
             }
             return start;
         case Token::PAREN:{
@@ -563,8 +625,13 @@ Expr* parseExpr(TokensReader& reader){
         return new BinaryExpr(binOpers[next->str], start, parseExpr(reader));
     }else if(next->str == "="){
         reader.read();
-        throw "todo: Assignment";
-        //return new Assignment();
+        auto left = dynamic_cast<LeftValue*>(start);
+        if(!left)throw "Cannot assign to non-leftvalue";
+        return new Assignment(left, parseExpr(reader));
+    }else if(assigners.contains(next->str)){
+        reader.read();
+        BinOper type = binOpers[next->str.substr(0, next->str.size()-1)];
+        return new OperAssignment(type, start, parseExpr(reader));
     }
     return start;
 }
@@ -623,14 +690,7 @@ Expr* parseFunc(TokensReader& reader){
 	if(_args->type != Token::PAREN)
 		throw missing('(');
     auto args = static_cast<Enclosure*>(_args);
-	DeclarationList* decList;
-	if(args->reader.end()){
-		decList = new DeclarationList({});
-	}else{
-        throw "todo: parseFlexDecList";
-		//decList = parseFlexDecList(args.reader);
-		args->reader.assetEnd();
-	}
+	auto decList = parseFlexDecList(args->reader);
 	Stmts stmts;
 	auto next = reader.read();
 	if(next->type == Token::BRACE){
@@ -646,38 +706,6 @@ Expr* parseFunc(TokensReader& reader){
 	return new FunExpr(decList, stmts);
 }
 
-Declarable* parseDeclarable(TokensReader& reader){
-    auto next = reader.read();
-    if(next->isValidVarname)return new Varname(next->str);
-    throw "todo: parseDeclarable";
-}
-DeclarationItem* parseDecItem(TokensReader& reader){
-    Declarable* declarable = parseDeclarable(reader);
-	Expr* defval = nullptr;
-	bool auto_null = false;
-	string next = reader.previewStr();
-	if(next=="?"){
-		reader.read();
-		auto_null = true;
-	}else if(next=="="){
-		reader.read();
-		defval = parseExpr(reader);
-	}
-	DeclarationItem* item = new DeclarationItem(declarable, defval); //todo: src
-	if(auto_null)item->addDefault();
-	return item;
-}
-DeclarationList* parseDecList(TokensReader& reader){
-    std::deque<DeclarationItem*> items;
-    while(true){
-		items.push_back(parseDecItem(reader));
-		if(reader.previewStr()==",")
-			reader.read();
-		else
-			return new DeclarationList(items);
-	}
-}
-
 Statement* parseStatement(TokensReader& reader){
     //若为空语句或读完，则返回 nullptr
     auto start = reader.preview();
@@ -690,11 +718,86 @@ Statement* parseStatement(TokensReader& reader){
             reader.skipStr(";");
             return new Return(expr);
         }
+        if(start->str=="break"){
+            reader.read();
+            reader.skipStr(";");
+            return new Break;
+        }
+        if(start->str=="continue"){
+            reader.read();
+            reader.skipStr(";");
+            return new Continue;
+        }
         if(start->str=="let"){
             reader.read();
             auto list = parseDecList(reader);
             reader.skipStr(";");
             return new Declaration(list);
+        }
+        if(start->str=="fun"){
+            reader.read();
+            auto name = reader.read();
+            if(!name->isValidVarname)throw "Invalid function name";
+            auto func = parseFunc(reader);
+            auto assignment = new DeclarationItem(new Varname(name->str), func);
+            return new Declaration(new DeclarationList({assignment}));
+        }
+        if(start->str=="if"){
+            reader.read();
+            auto cond = parseCond(reader);
+            auto block = parseBlockOrStatement(reader);
+            if(reader.skipStr("else")){
+                auto elseBlock = parseBlockOrStatement(reader);
+                return new IfStmt(cond, block, elseBlock);
+            }
+            return new IfStmt(cond, block, nullptr);
+        }
+        if(start->str=="switch"){
+            reader.read();
+            auto next = reader.read();
+            if(next->type!=Token::PAREN)throw unexpected(next->str, "(...)");
+            auto cl = static_cast<Enclosure*>(next);
+            auto expr = parseExpr(cl->reader);
+            cl->reader.assetEnd();
+            std::vector<CaseBlock*> cases;
+            Block* defaultBlock = nullptr;
+            while(true){
+                auto nextStr = reader.previewStr();
+                if(nextStr=="case"){
+                    reader.read();
+                    auto cond = parseFlexExprList(reader);
+                    if(cond->exprs.empty())throw "Empty case condition";
+                    auto block = parseBlockOrStatement(reader);
+                    cases.push_back(new CaseBlock(cond, block));
+                }else if(nextStr=="else"){
+                    reader.read();
+                    defaultBlock = parseBlockOrStatement(reader);
+                    break;
+                }else{
+                    break;
+                }
+            }
+            if(cases.empty())
+                throw "Switch statement must have at least one case";
+            return new SwitchStmt(expr, cases, defaultBlock);
+        }
+        if(start->str=="while"){
+            reader.read();
+            auto cond = parseCond(reader);
+            auto block = parseBlockOrStatement(reader);
+            return new WhileStmt(cond, block);
+        }
+        if(start->str=="for"){
+            reader.read();
+            auto next = reader.read();
+            if(next->type!=Token::PAREN)throw unexpected(next->str, "(...)");
+            auto cl = static_cast<Enclosure*>(next);
+            auto declarable = parseDeclarable(cl->reader);
+            cl->reader.assetStr("in");
+            auto iterable = parseExpr(cl->reader);
+            cl->reader.assetEnd();
+            auto body = parseBlockOrStatement(reader);
+            return new ForStmt(declarable, iterable, body);
         }
         throw unexpected(start->str);
     }
@@ -707,6 +810,19 @@ Stmts parseStatements(TokensReader& reader){
         if(reader.end())return stmts;
         auto stmt = parseStatement(reader);
         if(stmt)stmts.push_back(stmt);
+    }
+}
+Block* parseBlockOrStatement(TokensReader& reader){
+    auto next = reader.preview();
+    if(!next)throw "Unfinished input";
+    if(next->type==Token::BRACE){
+        auto cl = static_cast<Enclosure*>(reader.read());
+        auto stmts = parseStatements(cl->reader);
+        return new Block(stmts);
+    }else{
+        auto stmt = parseStatement(reader);
+        if(!stmt)return new Block({}); //空语句
+        return new Block({stmt});
     }
 }
 

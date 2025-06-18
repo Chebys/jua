@@ -41,8 +41,8 @@ Jua_Val* Varname::calc(Scope* env){
     }
     return val;
 }
-void Varname::assign(Scope*, Jua_Val*){
-    throw "todo: Varname::assign";
+void Varname::assign(Scope* env, Jua_Val* val){
+    env->assign(str, val);
 }
 void Varname::declare(Scope* env, Jua_Val* val){
     env->setProp(str, val);
@@ -64,7 +64,6 @@ void DeclarationItem::declare(Scope* env, Jua_Val* val){
     if(!val)val = initval->calc(env);
     body->declare(env, val);
 }
-
 void DeclarationList::rawDeclare(Scope* env, const jualist& vals){
     for(size_t i=0; i<decItems.size(); i++){
         auto item = decItems[i];
@@ -95,6 +94,15 @@ void PropRef::assign(Scope* env, Jua_Val* val){
     if(tar->type != Jua_Val::Obj)throw "not an object";
     auto obj = static_cast<Jua_Obj*>(tar);
     obj->setProp(prop, val);
+}
+Jua_Val* MethWrapper::calc(Scope* env){
+    auto obj = expr->calc(env);
+    auto meth = obj->getProp(key);
+    if(!meth)throw "no method";
+    return new Jua_NativeFunc([obj, meth](jualist& args){
+        args.push_front(obj);
+        return meth->call(args);
+    });
 }
 Jua_Val* Subscription::calc(Scope* env){
     auto obj = expr->calc(env);
@@ -136,11 +144,59 @@ Jua_Val* BinaryExpr::calc(Scope* env){
     auto lv = left->calc(env), rv = right->calc(env);
     return operate(oper, lv, rv);
 }
+Jua_Val* Assignment::calc(Scope* env){
+    auto val = right->calc(env);
+    left->assign(env, val);
+    return val;
+}
+Jua_Val* OperAssignment::calc(Scope* env){
+    auto leftVal = left->calc(env);
+    auto rightVal = right->calc(env);
+    Jua_Val* result = operate(type, leftVal, rightVal);
+    assignee->assign(env, result);
+    return result;
+}
+
+Jua_Val* TernaryExpr::calc(Scope* env){
+    auto cond = condExpr->calc(env);
+    if(cond->toBoolean())
+        return trueExpr->calc(env);
+    else
+        return falseExpr->calc(env);
+}
 
 void Return::exec(Scope* env, Controller* ctrl){
     ctrl->retval = expr ? expr->calc(env) : Jua_Null::getInst();
 }
 
+void IfStmt::exec(Scope* env, Controller* controller){
+    if(cond->calc(env)->toBoolean())
+        body->exec(new Scope(env), controller);
+    else if(elseBody)
+        elseBody->exec(new Scope(env), controller);
+}
+void SwitchStmt::exec(Scope* env, Controller* controller){
+    auto exprVal = expr->calc(env);
+    for(auto cb: cases){
+        if(cb->cond->contains(env, exprVal)){
+            cb->body->exec(new Scope(env), controller);
+            return;
+        }
+    }
+    if(defaultBody)
+        defaultBody->exec(new Scope(env), controller);
+}
+void WhileStmt::exec(Scope* env, Controller* controller){
+    while(cond->calc(env)->toBoolean()){
+        body->exec(new Scope(env), controller);
+        controller->continuing = false;
+        if(controller->isPending()){
+            controller->breaking = false;
+            break;
+        }
+    }
+}
+//todo: ForStmt::exec
 
 Block::Block(Stmts stmts): statements(stmts){
     for(auto stmt: stmts){
@@ -153,7 +209,7 @@ Block::Block(Stmts stmts): statements(stmts){
 void Block::exec(Scope* env, Controller* controller){ //env是新产生的作用域
     //d_log("Block::exec");
     for(auto stmt: statements)
-        if(controller->isPending)break;
+        if(controller->isPending())break;
         else stmt->exec(env, controller);
     env->gc();
 }
@@ -165,7 +221,7 @@ Jua_Val* FunctionBody::exec(Scope* env){
         controller->retval = nullptr;
     else
         retval = Jua_Null::getInst();
-    if(controller->isPending)
+    if(controller->isPending())
         throw "isPending";
     delete controller;
     return retval;

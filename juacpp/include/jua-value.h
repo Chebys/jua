@@ -161,6 +161,11 @@ struct Jua_Str: Jua_Val{
     Jua_Str(): Jua_Val(Str){}
     Jua_Bool* hasItem(Jua_Val*);
     Jua_Val* getItem(Jua_Val*);
+    Jua_Val* add(Jua_Val* val){
+        if(val->type != Str)throw "type error";
+        auto str = static_cast<Jua_Str*>(val);
+        return new Jua_Str(value + str->value);
+    }
     bool operator==(Jua_Val *);
     string toString(){ return value; }
     bool toBoolean(){ return value.size(); }
@@ -176,6 +181,15 @@ struct Scope: Jua_Obj{
     Scope* parent;
     Scope(Scope* p=nullptr): parent(p){ if(p)p->addRef(); }
     Jua_Val* inheritProp(const string&) override;
+    void assign(const string& key, Jua_Val* val){
+        for(auto scope = this; scope; scope = scope->parent){
+            if(scope->dict.contains(key)){
+                scope->setProp(key, val);
+                return;
+            }
+        }
+        throw string("Variable not found: ") + key;
+    }
 };
 struct Jua_NativeFunc: Jua_Func{
     typedef std::function<Jua_Val*(jualist&)> Native; //可返回空

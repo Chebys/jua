@@ -73,7 +73,12 @@ struct PropRef: OptionalPropRef, LeftValue{
     Jua_Val* calc(Scope* env);
 	void assign(Scope* env, Jua_Val* val);
 };
-struct MethWrapper;
+struct MethWrapper: Expr{
+    Expr* expr;
+    string key;
+    MethWrapper(Expr* e, string n): expr(e), key(n){}
+    Jua_Val* calc(Scope* env);
+};
 struct UnitaryExpr: Expr{
     UniOper oper;
     Expr* pri;
@@ -88,7 +93,22 @@ struct BinaryExpr: Expr{
 	Jua_Val* calc(Scope* env);
 };
 struct Assignment: Expr{
-    //todo
+    LeftValue* left;
+    Expr* right;
+    Assignment(LeftValue* l, Expr* r): left(l), right(r){}
+    Jua_Val* calc(Scope* env);
+};
+struct OperAssignment: Expr{
+    BinOper type;
+    LeftValue* assignee;
+    Expr* left;
+    Expr* right;
+    OperAssignment(BinOper t, Expr* l, Expr* r): type(t), left(l), right(r){
+        assignee = dynamic_cast<LeftValue*>(l);
+        if(!assignee)
+            throw "Cannot assign to non-leftvalue";
+    }
+    Jua_Val* calc(Scope* env);
 };
 struct Subscription: Expr, LeftValue{
     Expr* expr;
@@ -97,12 +117,24 @@ struct Subscription: Expr, LeftValue{
 	Jua_Val* calc(Scope* env);
 	void assign(Scope* env, Jua_Val* val);
 };
-struct TernaryExpr;
+struct TernaryExpr: Expr{
+    Expr* condExpr;
+    Expr* trueExpr;
+    Expr* falseExpr;
+    TernaryExpr(Expr* c, Expr* t, Expr* f): condExpr(c), trueExpr(t), falseExpr(f){}
+    Jua_Val* calc(Scope*);
+};
 struct FlexibleList{
     std::vector<Expr*> exprs;
     FlexibleList(std::vector<Expr*>& list): exprs(list){};
     FlexibleList(initializer_list<Expr*> list): exprs(list){};
     jualist calc(Scope*);
+    bool contains(Scope* env, Jua_Val* val) const {
+        for(auto expr: exprs){
+            if(expr->calc(env) == val) return true;
+        }
+        return false;
+    }
 };
 struct Call: Expr{
     Expr* calee;
@@ -124,8 +156,12 @@ struct ArrayExpr: Expr{
 };
 
 struct Controller{
-    bool isPending = false;
+    bool breaking = false;
+    bool continuing = false;
     Jua_Val* retval = nullptr;
+    bool isPending() const {
+        return breaking || continuing || retval;
+    }
 };
 
 struct Statement{
@@ -155,6 +191,72 @@ struct Declaration: Statement{
 struct Return: Statement{
     Expr* expr;
     Return(Expr* e=nullptr): expr(e){}
+    void exec(Scope*, Controller*);
+};
+struct Break: Statement{
+    Break(){
+        pending_break = this;
+    }
+    void exec(Scope*, Controller* controller){
+        controller->breaking = true;
+    }
+};
+struct Continue: Statement{
+    Continue(){
+        pending_continue = this;
+    }
+    void exec(Scope*, Controller* controller){
+        controller->continuing = true;
+    }
+};
+
+struct Block;
+struct IfStmt: Statement{
+    Expr* cond;
+    Block* body;
+    Block* elseBody;
+    IfStmt(Expr* c, Block* b, Block* e): cond(c), body(b), elseBody(e){
+        pending_continue = body->pending_continue ? body->pending_continue
+                         : elseBody ? elseBody->pending_continue : nullptr;
+        pending_break = body->pending_break ? body->pending_break
+                         : elseBody ? elseBody->pending_break : nullptr;
+    }
+    void exec(Scope*, Controller*);
+};
+struct CaseBlock{
+    FlexibleList* cond;
+    Block* body;
+    CaseBlock(FlexibleList* c, Block* b): cond(c), body(b){}
+};
+struct SwitchStmt: Statement{
+    Expr* expr;
+    std::vector<CaseBlock*> cases;
+    Block* defaultBody = nullptr;
+    SwitchStmt(Expr* e, std::vector<CaseBlock*>& cs, Block* d):
+        expr(e), cases(cs), defaultBody(d){
+        pending_continue = defaultBody ? defaultBody->pending_continue : nullptr;
+        pending_break = defaultBody ? defaultBody->pending_break : nullptr;
+        for(auto cb: cases){
+            if(!pending_continue)
+                pending_continue = cb->body->pending_continue;
+            if(!pending_break)
+                pending_break = cb->body->pending_break;
+        }
+    }
+    void exec(Scope*, Controller*);
+};
+struct WhileStmt: Statement{
+    Expr* cond;
+    Block* body;
+    WhileStmt(Expr* c, Block* b): cond(c), body(b){}
+    void exec(Scope*, Controller*);
+};
+struct ForStmt: Statement{
+    Declarable*  declarable;
+    Expr* iterable;
+    Block* body;
+    ForStmt(Declarable* d, Expr* i, Block* b):
+        declarable(d), iterable(i), body(b){}
     void exec(Scope*, Controller*);
 };
 

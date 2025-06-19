@@ -3,8 +3,6 @@
 #include <filesystem>
 #include "jua-vm.h"
 
-const char* default_module = "statements";
-
 namespace fs = std::filesystem;
 using std::cout;
 
@@ -35,7 +33,6 @@ struct JuaRuntime: JuaVM{
         return script;
     }
     void j_stdout(const jualist& vals){
-        cout << "j_stdout: ";
         size_t len = vals.size();
         if(!len)cout << '\n';
         std::string str(vals[0]->toString());
@@ -51,31 +48,13 @@ struct JuaRuntime: JuaVM{
 };
 
 int main(int argc, char* argv[]){
-    //第一个参数指定模块名（不含jua后缀），默认 "main"
-    try{
-        const char* main_module;
-        if(argc>1)
-            main_module = argv[1];
-        else
-            main_module = default_module;
-        SetConsoleToUTF8();
-        cout << "构造 JuaRuntime\n";
-        JuaRuntime RT(main_module);
-        cout << "JuaVM::run\n";
-        RT.run();
-        cout << "JuaVM::run 完毕\n";
-    }catch(JuaError* err){
-        cout << "在 JuaVM::run 外部捕获 JuaError: " << err->toDebugString() << '\n';
-    }catch(const char* str){
-        cout<<str<<'\n';
-    }catch(string str){
-        cout<<str<<'\n';
-    }catch(const std::exception& e){
-        std::cerr << "std::exception " << e.what() << '\n';
-    }catch(...){
-        cout<<"error of unknown type\n";
+    SetConsoleToUTF8();
+    if(argc > 1){
+        const char* main_module = argv[1];
+        JuaRuntime runtime(main_module);
+        runtime.run();
+    }else{
+        throw "todo: 进入 REPL 模式";
     }
-    cout << "按 Enter 键退出\n";
-    getchar();
     return 0;
 }

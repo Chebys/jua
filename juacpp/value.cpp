@@ -100,6 +100,9 @@ bool Jua_Val::operator==(Jua_Val* val){
 Jua_Bool* Jua_Val::toJuaBool(){
     return Jua_Bool::getInst(toBoolean());
 }
+int64_t Jua_Val::toInt(){
+    throw new JuaTypeError("toInt() called on a non-number value");
+}
 
 void Jua_Val::gc(){
     if(!ref){
@@ -127,14 +130,14 @@ Jua_Bool* Jua_Obj::hasItem(Jua_Val* key){
     auto fn = getMetaMethod("hasItem");
     if(fn)return fn->call({this, key})->toJuaBool();
     if(key->type!=Str)
-        throw "type error";
+        throw new JuaTypeError("key must be a string");
     return Jua_Bool::getInst(getProp(key->toString()));
 }
 Jua_Val* Jua_Obj::getItem(Jua_Val* key){
     auto fn = getMetaMethod("getItem");
     if(fn)return fn->call({this, key});
     if(key->type!=Str)
-        throw "type error";
+        throw new JuaTypeError("key must be a string");
     Jua_Val* val = getProp(key->toString());
     return val ? val : Jua_Null::getInst();
 }
@@ -145,7 +148,7 @@ void Jua_Obj::setItem(Jua_Val* key, Jua_Val* val){
         return;
     }
     if(key->type!=Str)
-        throw "type error";
+        throw new JuaTypeError("key must be a string");
     setProp(key->toString(), val);
 }
 void Jua_Obj::assignProps(Jua_Obj* obj){
@@ -178,37 +181,37 @@ Jua_Val* Jua_Num::unm(){
     return new Jua_Num(vm, -value);
 }
 Jua_Val* Jua_Num::add(Jua_Val* val){
-    if(val->type!=Num)throw "type error";
+    if(val->type!=Num)throw new JuaTypeError("try to add non-number");
     auto num = static_cast<Jua_Num*>(val);
     return new Jua_Num(vm, value + num->value);
 }
 Jua_Val* Jua_Num::sub(Jua_Val* val){
-    if(val->type!=Num)throw "type error";
+    if(val->type!=Num)throw new JuaTypeError("try to sub non-number");
     auto num = static_cast<Jua_Num*>(val);
     return new Jua_Num(vm, value - num->value);
 }
 Jua_Val* Jua_Num::mul(Jua_Val* val){
-    if(val->type!=Num)throw "type error";
+    if(val->type!=Num)throw new JuaTypeError("try to mul non-number");
     auto num = static_cast<Jua_Num*>(val);
     return new Jua_Num(vm, value * num->value);
 }
 Jua_Val* Jua_Num::div(Jua_Val* val){
-    if(val->type!=Num)throw "type error";
+    if(val->type!=Num)throw new JuaTypeError("try to div non-number");
     auto num = static_cast<Jua_Num*>(val);
     return new Jua_Num(vm, value / num->value);
 }
 Jua_Bool* Jua_Num::lt(Jua_Val* val){
-    if(val->type!=Num)throw "type error";
+    if(val->type!=Num)throw new JuaTypeError("try to compare non-number");
     auto num = static_cast<Jua_Num*>(val);
     return Jua_Bool::getInst(value < num->value);
 }
 Jua_Bool* Jua_Num::le(Jua_Val* val){
-    if(val->type!=Num)throw "type error";
+    if(val->type!=Num)throw new JuaTypeError("try to compare non-number");
     auto num = static_cast<Jua_Num*>(val);
     return Jua_Bool::getInst(value <= num->value);
 }
 Jua_Val* Jua_Num::range(Jua_Val* val){
-    if(val->type!=Num)throw "type error";
+    if(val->type!=Num)throw new JuaTypeError("try to create range with non-number");
     auto num = static_cast<Jua_Num*>(val);
     auto range = new Jua_Obj(vm, vm->RangeProto);
     range->setProp("start", new Jua_Num(vm, value));
@@ -228,7 +231,7 @@ string Jua_Num::toString(){
 }
 
 size_t correctIndex(Jua_Val* num, size_t len){
-    if(num->type!=Jua_Val::Num)throw "type error";
+    if(num->type!=Jua_Val::Num)throw new JuaTypeError("index must be a number");
     size_t index = num->toInt();
     return index % len;
 }
@@ -241,6 +244,11 @@ Jua_Bool* Jua_Str::hasItem(Jua_Val* val){
 Jua_Val* Jua_Str::getItem(Jua_Val* key){
     size_t i = correctIndex(key, value.length());
     return new Jua_Str(vm, {value[i]});
+}
+Jua_Val* Jua_Str::add(Jua_Val* val){
+    if(val->type!=Str)throw new JuaTypeError("try to add non-string");
+    auto str = static_cast<Jua_Str*>(val);
+    return new Jua_Str(vm, value + str->value);
 }
 bool Jua_Str::operator==(Jua_Val* val){
     if(!val || val->type!=Str)
@@ -283,7 +291,7 @@ Jua_Val* Jua_Buffer::read(Jua_Val* _start, Jua_Val* _end){
 }
 void Jua_Buffer::write(Jua_Val* _str, Jua_Val* _pos){
     if(!_str || _str->type!=Str)
-        throw "type error";
+        throw new JuaTypeError("value must be a string");
     std::string& str = static_cast<Jua_Str*>(_str)->value;
     size_t pos = correctIndex(_pos, length);
     size_t len = str.size();

@@ -1,5 +1,6 @@
 #include "jua-value.h"
 #include "jua-operators.h"
+#include <format>
 
 struct Expr{
     virtual Jua_Val* calc(Scope* env) = 0;
@@ -129,9 +130,9 @@ struct FlexibleList{
     FlexibleList(std::vector<Expr*>& list): exprs(list){};
     FlexibleList(initializer_list<Expr*> list): exprs(list){};
     jualist calc(Scope*);
-    bool contains(Scope* env, Jua_Val* val) const {
+    bool contains(Scope* env, Jua_Val* val){
         for(auto expr: exprs){
-            if(expr->calc(env) == val) return true;
+            if(*expr->calc(env) == val) return true;
         }
         return false;
     }
@@ -287,4 +288,15 @@ struct FunExpr: Expr{
 	}
 };
 
+struct JuaSyntaxError: JuaError{
+    size_t pos = -1;
+    size_t line = -1;
+    size_t col = -1;
+    JuaSyntaxError(const string& msg, size_t p, size_t l, size_t c):
+        JuaError(msg), pos(p), line(l), col(c){}
+    string toDebugString() override {
+        if(pos == -1) return std::format("JuaSyntaxError: {}", message);
+        return std::format("JuaSyntaxError: {} at {}:{}", message, line, col);
+    }
+};
 FunctionBody* parse(const string&);

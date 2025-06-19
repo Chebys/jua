@@ -1,4 +1,5 @@
 #include "jua-syntax.h"
+#include "jua-vm.h"
 
 Jua_Val* LiteralStr::calc(Scope* env){
     return new Jua_Str(env->vm, value);
@@ -216,7 +217,12 @@ void WhileStmt::exec(Scope* env, Controller* controller){
 void ForStmt::exec(Scope* env, Controller* controller){
     auto target = iterable->calc(env);
     auto next = target->getMetaMethod("next");
-    if(!next)throw "iterable must have next() method";
+    if(!next){
+        if(target->type == Jua_Val::Obj)
+            next = target->vm->obj_next;
+        else
+            throw "iterable without next() method must be an object";
+    }
     Jua_Val *nextResult, *value, *done, *key = Jua_Null::getInst();
     while(true){
         nextResult = next->call({target, key});

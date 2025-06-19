@@ -91,9 +91,7 @@ struct Jua_Val{
     virtual string safeToString(){ return toString(); }
     virtual bool toBoolean(){ return true; }
     virtual Jua_Bool* toJuaBool();
-    virtual int64_t toInt(){ //仅用于数字
-        throw "type error";
-    }
+    virtual int64_t toInt(); //仅用于数字
     virtual string getTypeName() = 0;
     virtual void gc();
 };
@@ -173,11 +171,7 @@ struct Jua_Str: Jua_Val{
     Jua_Str(JuaVM* vm_, const string& v = "");
     Jua_Bool* hasItem(Jua_Val*);
     Jua_Val* getItem(Jua_Val*);
-    Jua_Val* add(Jua_Val* val){
-        if(val->type != Str)throw "type error";
-        auto str = static_cast<Jua_Str*>(val);
-        return new Jua_Str(vm, value + str->value);
-    }
+    Jua_Val* add(Jua_Val* val);
     bool operator==(Jua_Val *);
     string toString(){ return value; }
     bool toBoolean(){ return value.size(); }
@@ -263,4 +257,8 @@ struct JuaErrorWithVal: JuaError{
         str.append(val ? val->safeToString() : "nullptr");
         return str;
     }
+};
+struct JuaTypeError: JuaError{
+    JuaTypeError(string msg): JuaError(msg){}
+    string toDebugString(){ return "JuaTypeError: " + message; }
 };

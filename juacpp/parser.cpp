@@ -13,11 +13,15 @@ static CharSet alphaChars = [](){
     }
     return alphaChars;
 }();
+static CharSet numChars = [](){
+    CharSet numChars;
+    for(char c='0'; c<='9'; c++)numChars.set(c);
+    return numChars;
+}();
 static CharSet wordChars = [](){
     CharSet wordChars(alphaChars);
     wordChars.set('_');
-    for(char c='0'; c<='9'; c++)
-        wordChars.set(c);
+    wordChars |= numChars;
     return wordChars;
 }();
 static CharSet hexChars = [](){
@@ -197,8 +201,11 @@ struct ScriptReader: TokensReader{
     Token* read();
     Token* preview();
     private:
+    void throwError(const string& msg){
+        throw JuaSyntaxError(msg, pos, line, col);
+    }
     char readChar(){
-        if(eof())throw "Unfinished input";
+        if(eof())throwError("Unfinished input");
         char c = script[pos];
         forward(c=='\n');
         return c;
@@ -229,20 +236,7 @@ struct ScriptReader: TokensReader{
         }
         return false;
     }
-    bool skipComment(){
-        if(pos+1 >= script.size())return false;
-        if(script[pos] != '/' || script[pos+1] != '/')return false;
-        forwardx(2);
-        while(!eof()){
-            char c = script[pos];
-            if(c == '\n'){
-                forward(true);
-                break;
-            }
-            forward();
-        }
-        return true;
-    }
+    bool skipComment();
     void skipVoid(){
         while(skipWhite());
         while(skipComment()){
@@ -268,7 +262,7 @@ struct ScriptReader: TokensReader{
         //读完时返回true
         while(!eof()){
             char next = script[pos];
-            if(next<'0' || next>'9')return false;
+            if(!numChars.test(next))return false;
             forward();
             start.push_back(next);
         }
@@ -292,7 +286,7 @@ struct ScriptReader: TokensReader{
         }
         if(readSimpleNum(num))return num;
         //此时非eof
-        if(script[pos]=='.'){
+        if(script[pos]=='.' && pos+1<script.size() && numChars.test(script[pos+1])){
             num.push_back('.');
             forward();
             if(readSimpleNum(num))return num;
@@ -302,8 +296,8 @@ struct ScriptReader: TokensReader{
             num.push_back('e');
             forward();
             char next = readChar();
-            if(next=='-' || '0'<=next || next<='9')num.push_back(next);
-            else throw next;
+            if(next=='-' || numChars.test(next))num.push_back(next);
+            else throwError("Invalid number: expected '-' or digit after 'e'");
             readSimpleNum(num);
         }
         return num;
@@ -313,7 +307,7 @@ struct ScriptReader: TokensReader{
         std::vector<Token*> list;
         while(true){
             skipVoid();
-            if(eof())throw missing(end);
+            if(eof())throwError(missing(end));
             if(script[pos]==end){
                 forward(); //假设 end 不是 newline
                 return list;
@@ -347,7 +341,7 @@ struct ScriptReader: TokensReader{
         char c = readChar();
         if(c=='x' || c=='u')throw "todo: \\x";
         else if('0'<=c && c<='9')throw "todo: \\0";
-        else if(c=='\n' && !allow_newline)throw "cannot wrap inside SQ string";
+        else if(c=='\n' && !allow_newline)throwError("cannot wrap inside SQ string");
         else if(escape_map.contains(c))return escape_map[c];
         return c;
     }
@@ -359,7 +353,7 @@ struct ScriptReader: TokensReader{
             char c = readChar();
             if(c=='\'')return value;
             if(c=='\\')value.push_back(escape());
-            else if(c=='\n')throw "cannot wrap inside SQ string";
+            else if(c=='\n')throwError("cannot wrap inside SQ string");
             else value.push_back(c);
         }
     }
@@ -383,7 +377,7 @@ Token* ScriptReader::read(){
         return _c;
     }
     auto token = doRead();
-    if(!token)throw "Unfinished input";
+    if(!token)throwError("Unfinished input");
     return token;
 }
 Token* ScriptReader::preview(){
@@ -435,11 +429,33 @@ std::pair<string, Token*> ScriptReader::readDQStr(){
             if(validWordStart(next)){
                 return {str, readWord(next)};
             }
-            throw "Invalid char";
+            throwError("Invalid char");
         }
         if(c=='\\')str.push_back(escape(true));
         else str.push_back(c);
     }
+}
+bool ScriptReader::skipComment(){
+    //跳过单行注释和多行注释
+    if(pos+1>=script.size() || script[pos]!='/')return false;
+
+    if(script[pos+1]=='/'){
+        forwardx(2);
+        while(!eof() && script[pos]!='\n')forward();
+        return true;
+    }
+    if(script[pos+1]=='*'){
+        forwardx(2);
+        while(true){
+            if(eof())throwError("Unfinished comment");
+            if(script[pos]=='*' && pos+1<script.size() && script[pos+1]=='/'){
+                forwardx(2);
+                return true;
+            }
+            forward();
+        }
+    }
+    return false;
 }
 
 Expr* parsePrimaryTail(Expr*, TokensReader&);
@@ -715,8 +731,7 @@ Expr* parseFunc(TokensReader& reader){
 		stmts = parseStatements(cl->reader);
 	}else if(next->str == "="){
 		auto expr = parseExpr(reader);
-        throw "todo: fun()=0";
-		//stmts = Stmts(new Return(expr));
+		stmts = Stmts({new Return(expr)});
 	}else{
 		throw unexpected(next->str);
 	}
@@ -726,7 +741,11 @@ Expr* parseFunc(TokensReader& reader){
 Statement* parseStatement(TokensReader& reader){
     //若为空语句或读完，则返回 nullptr
     auto start = reader.preview();
-    if(!start || start->str==";")return nullptr;
+    if(!start)return nullptr;
+    if(start->str==";"){
+        reader.read();
+        return nullptr; //空语句
+    }
     if(start->isKeyword){
         if(start->str=="return"){
             reader.read();
@@ -782,7 +801,10 @@ Statement* parseStatement(TokensReader& reader){
                 auto nextStr = reader.previewStr();
                 if(nextStr=="case"){
                     reader.read();
-                    auto cond = parseFlexExprList(reader);
+                    auto next = reader.read();
+                    if(next->type!=Token::PAREN)throw unexpected(next->str, "(...)");
+                    auto cl = static_cast<Enclosure*>(next);
+                    auto cond = parseFlexExprList(cl->reader);
                     if(cond->exprs.empty())throw "Empty case condition";
                     auto block = parseBlockOrStatement(reader);
                     cases.push_back(new CaseBlock(cond, block));

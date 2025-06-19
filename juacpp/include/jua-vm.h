@@ -8,9 +8,12 @@ struct JuaVM{
     Jua_Obj* NumberProto;
     Jua_Obj* BooleanProto;
     Jua_Obj* FunctionProto;
+    Jua_Obj* ObjectProto;
     Jua_Obj* ArrayProto;
     Jua_Obj* BufferProto;
     Jua_Obj* RangeProto;
+
+    Jua_NativeFunc* obj_next;
 
     JuaVM();
     ~JuaVM(){
@@ -22,6 +25,7 @@ struct JuaVM{
         delete NumberProto;
         delete BooleanProto;
         delete FunctionProto;
+        delete ObjectProto;
         delete ArrayProto;
         delete BufferProto;
         delete RangeProto;

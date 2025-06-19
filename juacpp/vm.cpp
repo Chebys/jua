@@ -27,37 +27,73 @@ void JuaVM::initBuiltins(){
     NumberProto = new Jua_Obj(this);
     BooleanProto = new Jua_Obj(this);
     FunctionProto = new Jua_Obj(this);
+    ObjectProto = new Jua_Obj(this);
     ArrayProto = new Jua_Obj(this);
     BufferProto = new Jua_Obj(this);
     RangeProto = new Jua_Obj(this);
     RangeProto->setProp("next", makeFunc([](jualist& args){
         //todo: 支持浮点数
+        if(args.size() < 2) throw "Range.next() requires 2 arguments";
         auto self = args[0];
-        if(!self || self->type != Jua_Val::Obj){
+        if(self->type != Jua_Val::Obj){
             throw string("Range.next() called on a non-object");
         }
         auto key = args[1];
-        if(!key || key->type != Jua_Val::Num){
+        size_t index;
+        if(key->type == Jua_Val::Num){
+            auto step = self->getProp("step");
+            if(!step || step->type != Jua_Val::Num)
+                throw string("Range.next() called on a non-range object");
+            index = key->toInt() + step->toInt();
+        }else{
             auto start = self->getProp("start");
             if(!start || start->type != Jua_Val::Num)
                 throw string("Range.next() called on a non-range object");
-            key = new Jua_Num(self->vm, start->toInt());
+            index = start->toInt();
         }
-        auto step = self->getProp("step");
-        if(!step || step->type != Jua_Val::Num)
-            throw string("Range.next() called on a non-range object");
+        
         auto end = self->getProp("end");
         if(!end || end->type != Jua_Val::Num)
             throw string("Range.next() called on a non-range object");
         auto res = new Jua_Obj(self->vm);
-        auto done = key->toInt() >= end->toInt();
+        bool done = index >= end->toInt();
         res->setProp("done", Jua_Bool::getInst(done));
         if(!done){
-            res->setProp("value", key);
-            res->setProp("key", new Jua_Num(self->vm, key->toInt() + step->toInt()));
+            auto value = new Jua_Num(self->vm, index);
+            res->setProp("value", value);
+            res->setProp("key", value);
         }
         return res;
     }));
+
+    obj_next = makeFunc([](jualist& args){
+        if(args.size() < 2) throw "Range.next() requires 2 arguments";
+        auto self = args[0];
+        if(self->type != Jua_Val::Obj){
+            throw string("Range.next() called on a non-object");
+        }
+        auto obj = static_cast<Jua_Obj*>(self);
+        auto key = args[1];
+        std::unordered_map<string, Jua_Val*>::iterator it;
+        if(key->type == Jua_Val::Str){
+            string str_key = key->toString();
+            it = obj->dict.find(str_key);
+            it++;
+        }else{
+            it = obj->dict.begin();
+        }
+        auto res = new Jua_Obj(self->vm);
+        if(it == obj->dict.end()){
+            res->setProp("done", Jua_Bool::getInst(true));
+        }else{
+            auto value = new Jua_Str(self->vm, it->first);
+            res->setProp("done", Jua_Bool::getInst(false));
+            res->setProp("key", value);
+            res->setProp("value", value);
+        }
+        return res;
+    });
+    ObjectProto->setProp("next", obj_next);
 }
 void JuaVM::makeGlobal(){
     _G = new Scope(this);

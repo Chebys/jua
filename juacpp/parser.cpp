@@ -220,6 +220,7 @@ struct ScriptReader: TokensReader{
         return pos >= script.size();
     }
     bool skipWhite(){
+        //若需要跳过多个空白符，则 while(skipWhite());
         if(eof())return false;
         char c = script[pos];
         if(whiteChars.test(c)){
@@ -228,9 +229,25 @@ struct ScriptReader: TokensReader{
         }
         return false;
     }
+    bool skipComment(){
+        if(pos+1 >= script.size())return false;
+        if(script[pos] != '/' || script[pos+1] != '/')return false;
+        forwardx(2);
+        while(!eof()){
+            char c = script[pos];
+            if(c == '\n'){
+                forward(true);
+                break;
+            }
+            forward();
+        }
+        return true;
+    }
     void skipVoid(){
         while(skipWhite());
-        //todo
+        while(skipComment()){
+            while(skipWhite());
+        }
     }
     Token* readWord(char start){
         string word(1, start);

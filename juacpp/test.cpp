@@ -3,11 +3,7 @@
 #include <filesystem>
 #include "jua-vm.h"
 
-#ifdef JUA_DEBUG
-const char* default_module = "expressions";
-#else
-const char* default_module = "main";
-#endif
+const char* default_module = "statements";
 
 namespace fs = std::filesystem;
 using std::cout;
@@ -61,7 +57,7 @@ int main(int argc, char* argv[]){
         if(argc>1)
             main_module = argv[1];
         else
-            main_module = default_module;
+            main_module = default_module; //todo: 进入交互模式
         SetConsoleToUTF8();
         cout << "构造 JuaRuntime\n";
         JuaRuntime RT(main_module);

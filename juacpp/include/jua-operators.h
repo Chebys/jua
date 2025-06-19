@@ -12,6 +12,7 @@ enum class BinOper{
     mul,
     div,
     mod,
+    range,
     lt,
     le,
     gt,
@@ -34,6 +35,7 @@ inline std::unordered_map<string, BinOper> binOpers{
     {"/", BinOper::div},
     {"%", BinOper::mod},
     {"^", BinOper::pow},
+    {"..", BinOper::range},
     {"<", BinOper::lt},
     {"<=", BinOper::le},
     {">", BinOper::gt},
@@ -60,6 +62,7 @@ inline Jua_Val* operate(BinOper type, Jua_Val* left, Jua_Val* right){
         case BinOper::sub: return left->sub(right);
         case BinOper::mul: return left->mul(right);
         case BinOper::div: return left->div(right);
+        case BinOper::range: return left->range(right);
         case BinOper::lt: return left->lt(right);
         case BinOper::le: return left->le(right);
         case BinOper::gt: return Jua_Bool::getInst(!left->le(right));
@@ -68,6 +71,6 @@ inline Jua_Val* operate(BinOper type, Jua_Val* left, Jua_Val* right){
         case BinOper::ne: return Jua_Bool::getInst(!(*left == right));
         case BinOper::and_: return left->toBoolean() ? right : left;
         case BinOper::or_: return left->toBoolean() ? left : right;
-        default: throw "todo: BinOper";
+        default: d_log(int(type)); throw "todo: BinOper";
     }
 }

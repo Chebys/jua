@@ -17,6 +17,7 @@ static_assert(
 using std::string;
 using std::initializer_list;
 
+struct JuaVM;
 struct Jua_Val;
 struct Jua_Obj;
 struct Jua_Bool;
@@ -30,13 +31,24 @@ void d_log(string, Jua_Val*);
 void d_log(string, int);
 
 struct Jua_Val{
+    JuaVM* vm = nullptr; //指向JuaVM实例
     enum JuaType{Obj, Null, Str, Num, Bool, Func};
     JuaType type;
     Jua_Obj* proto;
     size_t ref = 0;
-    Jua_Val(JuaType t, Jua_Obj* p = nullptr): type(t), proto(p){}
+    Jua_Val(JuaVM* vm_, JuaType t, Jua_Obj* p = nullptr): vm(vm_), type(t), proto(p){}
     void addRef(){ ref++; }
     void release();
+    virtual bool isType(int type_id){
+        //用于自定义类型判断（自定义类型应当是 Jua_Obj 的子类）
+        //保留的 type_id:
+        // 0: 未使用
+        // 1: Scope
+        // 2: Jua_Array
+        // 3: Jua_Buffer
+        // 4-15: 未使用
+        return false;
+    }
     virtual Jua_Val* getOwn(const string& key){
         return nullptr;
     }
@@ -55,7 +67,7 @@ struct Jua_Val{
         string str(key);
         return getMetaMethod(str);
     }
-    //以下指针均非空
+    //以下均不会返回 nullptr
     virtual Jua_Bool* hasItem(Jua_Val*);
     virtual Jua_Val* getItem(Jua_Val*);
     virtual void setItem(Jua_Val*, Jua_Val*);
@@ -73,6 +85,7 @@ struct Jua_Val{
     virtual Jua_Bool* lt(Jua_Val*);
     virtual Jua_Bool* le(Jua_Val*);
     virtual Jua_Val* range(Jua_Val*);
+
     virtual bool operator==(Jua_Val* val);
     virtual string toString() = 0; //const string& str = toString()
     virtual string safeToString(){ return toString(); }
@@ -95,11 +108,11 @@ struct Jua_Null: Jua_Val{
         return inst;
     }
     private:
-    Jua_Null(): Jua_Val(Null){}
+    Jua_Null(): Jua_Val(nullptr, Null){}
 };
 struct Jua_Obj: Jua_Val{
     std::unordered_map<string, Jua_Val*> dict;
-    Jua_Obj(Jua_Obj* p = nullptr);
+    Jua_Obj(JuaVM* vm_, Jua_Obj* p = nullptr);
     ~Jua_Obj();
     bool hasOwn(Jua_Val* key);
     Jua_Val* getOwn(size_t hash, const string& key); //todo
@@ -136,11 +149,11 @@ struct Jua_Bool: Jua_Val{
         return v ? t : f;
     }
     private:
-    Jua_Bool(bool v): Jua_Val(Bool), value(v){};
+    Jua_Bool(bool v): Jua_Val(nullptr, Bool), value(v){}
 };
 struct Jua_Num: Jua_Val{
     double value;
-    Jua_Num(double v): Jua_Val(Num), value(v){};
+    Jua_Num(JuaVM* vm_, double v): Jua_Val(vm_, Num), value(v){}
     Jua_Val* unm();
     Jua_Val* add(Jua_Val*);
     Jua_Val* sub(Jua_Val*);
@@ -157,14 +170,13 @@ struct Jua_Num: Jua_Val{
 };
 struct Jua_Str: Jua_Val{
     string value;
-    Jua_Str(const string& v): Jua_Val(Str), value(v){} //会进行拷贝
-    Jua_Str(): Jua_Val(Str){}
+    Jua_Str(JuaVM* vm_, const string& v = "");
     Jua_Bool* hasItem(Jua_Val*);
     Jua_Val* getItem(Jua_Val*);
     Jua_Val* add(Jua_Val* val){
         if(val->type != Str)throw "type error";
         auto str = static_cast<Jua_Str*>(val);
-        return new Jua_Str(value + str->value);
+        return new Jua_Str(vm, value + str->value);
     }
     bool operator==(Jua_Val *);
     string toString(){ return value; }
@@ -172,14 +184,22 @@ struct Jua_Str: Jua_Val{
     string getTypeName(){ return "string"; }
 };
 struct Jua_Func: Jua_Val{
-    Jua_Func(): Jua_Val(Func){};
+    Jua_Func(JuaVM* vm_): Jua_Val(vm_, Func){}
     string toString(){ return "<function>"; }
     string getTypeName(){ return "function"; }
 };
 
 struct Scope: Jua_Obj{
+    static const int type_id = 1;
     Scope* parent;
-    Scope(Scope* p=nullptr): parent(p){ if(p)p->addRef(); }
+    Scope(JuaVM* vm_, Scope* p=nullptr): Jua_Obj(vm_, p), parent(p){ if(p)p->addRef(); }
+    Scope(Scope* p): Scope(p->vm, p){} //从父作用域创建新作用域
+    ~Scope(){
+        if(parent)parent->release();
+    }
+    bool isType(int type_id) override {
+        return type_id == Scope::type_id;
+    }
     Jua_Val* inheritProp(const string&) override;
     void assign(const string& key, Jua_Val* val){
         for(auto scope = this; scope; scope = scope->parent){
@@ -192,26 +212,36 @@ struct Scope: Jua_Obj{
     }
 };
 struct Jua_NativeFunc: Jua_Func{
-    typedef std::function<Jua_Val*(jualist&)> Native; //可返回空
+    typedef std::function<Jua_Val*(jualist&)> Native; //可返回 nullptr
     Native native;
-    Jua_NativeFunc(Native fn): native(fn){}
+    Jua_NativeFunc(JuaVM* vm_, Native fn): Jua_Func(vm_), native(fn){}
     Jua_Val* call(jualist& args){
-        return native(args);
+        auto res = native(args);
+        if(res)return res;
+        return Jua_Null::getInst();
     }
 };
 struct Jua_Array: Jua_Obj{
+    static const int type_id = 2;
     jualist items;
-    Jua_Array(const jualist& list): items(list){}
+    Jua_Array(JuaVM* vm_, const jualist& list): Jua_Obj(vm_), items(list){}
+    bool isType(int type_id) override {
+        return type_id == Jua_Array::type_id;
+    }
     Jua_Val* getItem(Jua_Val*);
     void setItem(Jua_Val*, Jua_Val*);
 };
 struct Jua_Buffer: Jua_Obj{
+    static const int type_id = 3;
     uint8_t* bytes;
     size_t length;
-    Jua_Buffer(size_t len): length(len){
+    Jua_Buffer(JuaVM* vm_, size_t len): Jua_Obj(vm_), length(len){
         bytes = new uint8_t[len];
     }
     ~Jua_Buffer(){ delete bytes; }
+    bool isType(int type_id) override {
+        return type_id == Jua_Buffer::type_id;
+    }
     Jua_Val* getItem(Jua_Val*);
     void setItem(Jua_Val*, Jua_Val*);
     Jua_Val* read(Jua_Val* start, Jua_Val* end);

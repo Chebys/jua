@@ -1,5 +1,6 @@
 #include "jua-value.h"
 #include <charconv>
+#include "jua-vm.h"
 
 void Jua_Val::release(){
     ref--;
@@ -107,7 +108,7 @@ void Jua_Val::gc(){
     }
 }
 
-Jua_Obj::Jua_Obj(Jua_Obj* p): Jua_Val(Obj, p){ if(p)p->addRef(); }
+Jua_Obj::Jua_Obj(JuaVM* vm_, Jua_Obj* p): Jua_Val(vm_, Obj, p){ if(p)p->addRef(); }
 Jua_Obj::~Jua_Obj(){ if(proto)proto->release(); }
 void Jua_Obj::setProp(const string& key, Jua_Val* val){
     if(dict.contains(key)){
@@ -174,27 +175,27 @@ bool Jua_Obj::isPropTrue(const char* key){
 }
 
 Jua_Val* Jua_Num::unm(){
-    return new Jua_Num(-value);
+    return new Jua_Num(vm, -value);
 }
 Jua_Val* Jua_Num::add(Jua_Val* val){
     if(val->type!=Num)throw "type error";
     auto num = static_cast<Jua_Num*>(val);
-    return new Jua_Num(value + num->value);
+    return new Jua_Num(vm, value + num->value);
 }
 Jua_Val* Jua_Num::sub(Jua_Val* val){
     if(val->type!=Num)throw "type error";
     auto num = static_cast<Jua_Num*>(val);
-    return new Jua_Num(value - num->value);
+    return new Jua_Num(vm, value - num->value);
 }
 Jua_Val* Jua_Num::mul(Jua_Val* val){
     if(val->type!=Num)throw "type error";
     auto num = static_cast<Jua_Num*>(val);
-    return new Jua_Num(value * num->value);
+    return new Jua_Num(vm, value * num->value);
 }
 Jua_Val* Jua_Num::div(Jua_Val* val){
     if(val->type!=Num)throw "type error";
     auto num = static_cast<Jua_Num*>(val);
-    return new Jua_Num(value / num->value);
+    return new Jua_Num(vm, value / num->value);
 }
 Jua_Bool* Jua_Num::lt(Jua_Val* val){
     if(val->type!=Num)throw "type error";
@@ -209,7 +210,11 @@ Jua_Bool* Jua_Num::le(Jua_Val* val){
 Jua_Val* Jua_Num::range(Jua_Val* val){
     if(val->type!=Num)throw "type error";
     auto num = static_cast<Jua_Num*>(val);
-    throw "todo: Jua_Num::range";
+    auto range = new Jua_Obj(vm, vm->RangeProto);
+    range->setProp("start", new Jua_Num(vm, value));
+    range->setProp("step", new Jua_Num(vm, 1));
+    range->setProp("end", new Jua_Num(vm, num->value));
+    return range;
 }
 bool Jua_Num::operator==(Jua_Val* val){
     if(!val || val->type!=Num)
@@ -228,13 +233,14 @@ size_t correctIndex(Jua_Val* num, size_t len){
     return index % len;
 }
 
+Jua_Str::Jua_Str(JuaVM* vm_, const string& v): Jua_Val(vm_, Str, vm_->StringProto), value(v){}
 Jua_Bool* Jua_Str::hasItem(Jua_Val* val){
     if(val->type!=Str)return Jua_Bool::getInst(false);
     return Jua_Bool::getInst(value.find(val->toString()) != string::npos);
 }
 Jua_Val* Jua_Str::getItem(Jua_Val* key){
     size_t i = correctIndex(key, value.length());
-    return new Jua_Str({value[i]});
+    return new Jua_Str(vm, {value[i]});
 }
 bool Jua_Str::operator==(Jua_Val* val){
     if(!val || val->type!=Str)
@@ -258,7 +264,7 @@ void Jua_Array::setItem(Jua_Val* key, Jua_Val* val){
 
 Jua_Val* Jua_Buffer::getItem(Jua_Val* key){
     size_t i = correctIndex(key, length);
-    return new Jua_Num(bytes[i]);
+    return new Jua_Num(vm, bytes[i]);
 }
 void Jua_Buffer::setItem(Jua_Val* key, Jua_Val* val){
     size_t i = correctIndex(key, length);
@@ -270,7 +276,7 @@ Jua_Val* Jua_Buffer::read(Jua_Val* _start, Jua_Val* _end){
     if(!end)end = length;
     if(start>=end)throw "range error";
     size_t len = end-start;
-    auto str = new Jua_Str();
+    auto str = new Jua_Str(vm);
     str->value.resize(len);
     memcpy(&str->value[0], bytes+start, len);
     return str;

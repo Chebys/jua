@@ -215,12 +215,7 @@ struct IfStmt: Statement{
     Expr* cond;
     Block* body;
     Block* elseBody;
-    IfStmt(Expr* c, Block* b, Block* e): cond(c), body(b), elseBody(e){
-        pending_continue = body->pending_continue ? body->pending_continue
-                         : elseBody ? elseBody->pending_continue : nullptr;
-        pending_break = body->pending_break ? body->pending_break
-                         : elseBody ? elseBody->pending_break : nullptr;
-    }
+    IfStmt(Expr* c, Block* b, Block* e);
     void exec(Scope*, Controller*);
 };
 struct CaseBlock{
@@ -232,17 +227,7 @@ struct SwitchStmt: Statement{
     Expr* expr;
     std::vector<CaseBlock*> cases;
     Block* defaultBody = nullptr;
-    SwitchStmt(Expr* e, std::vector<CaseBlock*>& cs, Block* d):
-        expr(e), cases(cs), defaultBody(d){
-        pending_continue = defaultBody ? defaultBody->pending_continue : nullptr;
-        pending_break = defaultBody ? defaultBody->pending_break : nullptr;
-        for(auto cb: cases){
-            if(!pending_continue)
-                pending_continue = cb->body->pending_continue;
-            if(!pending_break)
-                pending_break = cb->body->pending_break;
-        }
-    }
+    SwitchStmt(Expr* e, std::vector<CaseBlock*>& cs, Block* d);
     void exec(Scope*, Controller*);
 };
 struct WhileStmt: Statement{
@@ -276,7 +261,7 @@ struct FunctionBody: Block{
         if(pending_break)
             throw pending_break;
     }
-    Jua_Val* exec(Scope*);
+    Jua_Val* exec(Scope*); //不会返回 nullptr
 };
 
 struct Jua_PFunc: Jua_Func{
@@ -284,7 +269,7 @@ struct Jua_PFunc: Jua_Func{
     DeclarationList* decList;
     FunctionBody* body;
     Jua_PFunc(Scope* env, DeclarationList* list, FunctionBody* b):
-        upenv(env), decList(list), body(b){}
+        Jua_Func(env->vm), upenv(env), decList(list), body(b){}
 	Jua_Val* call(jualist& args){
 		auto env = new Scope(upenv);
 		decList->rawDeclare(env, args);

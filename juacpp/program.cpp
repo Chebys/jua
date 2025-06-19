@@ -1,7 +1,7 @@
 #include "jua-syntax.h"
 
-Jua_Val* LiteralStr::calc(Scope*){
-    return new Jua_Str(value);
+Jua_Val* LiteralStr::calc(Scope* env){
+    return new Jua_Str(env->vm, value);
 }
 Jua_Val* Template::calc(Scope* env){
     string str = strList[0];
@@ -10,13 +10,13 @@ Jua_Val* Template::calc(Scope* env){
         str += val->toString();
         str += strList[i+1];
     }
-    return new Jua_Str(str);
+    return new Jua_Str(env->vm, str);
 }
 LiteralNum* LiteralNum::eval(const string& str){
     return new LiteralNum(std::stod(str));
 }
-Jua_Val* LiteralNum::calc(Scope*){
-    return new Jua_Num(value);
+Jua_Val* LiteralNum::calc(Scope* env){
+    return new Jua_Num(env->vm, value);
 }
 
 Jua_Val* Keyword::calc(Scope* env){
@@ -99,7 +99,7 @@ Jua_Val* MethWrapper::calc(Scope* env){
     auto obj = expr->calc(env);
     auto meth = obj->getProp(key);
     if(!meth)throw "no method";
-    return new Jua_NativeFunc([obj, meth](jualist& args){
+    return new Jua_NativeFunc(env->vm, [obj, meth](jualist& args){
         args.push_front(obj);
         return meth->call(args);
     });
@@ -123,10 +123,10 @@ Jua_Val* Call::calc(Scope* env){
 }
 
 Jua_Val* ArrayExpr::calc(Scope* env){
-    return new Jua_Array(list->calc(env));
+    return new Jua_Array(env->vm, list->calc(env));
 }
 Jua_Val* ObjExpr::calc(Scope* env){
-    auto obj = new Jua_Obj;
+    auto obj = new Jua_Obj(env->vm);
     for(auto kv: entries){
         auto key = kv.first->calc(env), val = kv.second->calc(env);
         if(key->type != Jua_Val::Str)
@@ -169,11 +169,28 @@ void Return::exec(Scope* env, Controller* ctrl){
     ctrl->retval = expr ? expr->calc(env) : Jua_Null::getInst();
 }
 
+IfStmt::IfStmt(Expr* c, Block* b, Block* e): cond(c), body(b), elseBody(e){
+    pending_continue = body->pending_continue ? body->pending_continue
+                     : elseBody ? elseBody->pending_continue : nullptr;
+    pending_break = body->pending_break ? body->pending_break
+                     : elseBody ? elseBody->pending_break : nullptr;
+}
 void IfStmt::exec(Scope* env, Controller* controller){
     if(cond->calc(env)->toBoolean())
         body->exec(new Scope(env), controller);
     else if(elseBody)
         elseBody->exec(new Scope(env), controller);
+}
+SwitchStmt::SwitchStmt(Expr* e, std::vector<CaseBlock*>& cs, Block* d):
+    expr(e), cases(cs), defaultBody(d){
+    pending_continue = defaultBody ? defaultBody->pending_continue : nullptr;
+    pending_break = defaultBody ? defaultBody->pending_break : nullptr;
+    for(auto cb: cases){
+        if(!pending_continue)
+            pending_continue = cb->body->pending_continue;
+        if(!pending_break)
+            pending_break = cb->body->pending_break;
+    }
 }
 void SwitchStmt::exec(Scope* env, Controller* controller){
     auto exprVal = expr->calc(env);
@@ -196,7 +213,29 @@ void WhileStmt::exec(Scope* env, Controller* controller){
         }
     }
 }
-//todo: ForStmt::exec
+void ForStmt::exec(Scope* env, Controller* controller){
+    auto target = iterable->calc(env);
+    auto next = target->getMetaMethod("next");
+    if(!next)throw "iterable must have next() method";
+    Jua_Val *nextResult, *value, *done, *key = Jua_Null::getInst();
+    while(true){
+        nextResult = next->call({target, key});
+        done = nextResult->getProp("done");
+        if(!done)throw "next() must return an value with 'done' property";
+        if(done->toBoolean())break;
+        value = nextResult->getProp("value");
+        if(!value)throw "next() must return an value with 'value' property if not done";
+        key = nextResult->getProp("key");
+        if(!key)throw "next() must return an value with 'key' property if not done";
+        declarable->declare(env, value);
+        body->exec(new Scope(env), controller);
+        controller->continuing = false;
+        if(controller->isPending()){
+            controller->breaking = false;
+            break;
+        }
+    }
+}
 
 Block::Block(Stmts stmts): statements(stmts){
     for(auto stmt: stmts){

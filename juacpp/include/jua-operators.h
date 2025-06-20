@@ -29,12 +29,12 @@ inline std::unordered_map<string, UniOper> uniOpers{
     {"!", UniOper::not_}
 };
 inline std::unordered_map<string, BinOper> binOpers{
-    {"+", BinOper::add},
-    {"-", BinOper::sub},
+    {"^", BinOper::pow},
     {"*", BinOper::mul},
     {"/", BinOper::div},
     {"%", BinOper::mod},
-    {"^", BinOper::pow},
+    {"+", BinOper::add},
+    {"-", BinOper::sub},
     {"..", BinOper::range},
     {"<", BinOper::lt},
     {"<=", BinOper::le},
@@ -46,6 +46,25 @@ inline std::unordered_map<string, BinOper> binOpers{
     {"is", BinOper::is},
     {"&&", BinOper::and_},
     {"||", BinOper::or_}
+};
+inline std::unordered_map<BinOper, int> binOperPriority{
+    {BinOper::pow, 12},
+    {BinOper::mul, 10},
+    {BinOper::div, 10},
+    {BinOper::mod, 9},
+    {BinOper::add, 8},
+    {BinOper::sub, 8},
+    {BinOper::range, 7},
+    {BinOper::lt, 6},
+    {BinOper::le, 6},
+    {BinOper::gt, 6},
+    {BinOper::ge, 6},
+    {BinOper::in, 6},
+    {BinOper::is, 6},
+    {BinOper::eq, 5},
+    {BinOper::ne, 5},
+    {BinOper::and_, 4},
+    {BinOper::or_, 3}
 };
 
 inline Jua_Val* operate(UniOper type, Jua_Val* val){

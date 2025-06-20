@@ -34,6 +34,7 @@ struct Jua_Val{
     JuaVM* vm = nullptr; //指向JuaVM实例
     enum JuaType{Obj, Null, Str, Num, Bool, Func};
     JuaType type;
+    size_t id = -1;
     Jua_Obj* proto;
     size_t ref = 0;
     Jua_Val(JuaVM* vm_, JuaType t, Jua_Obj* p = nullptr): vm(vm_), type(t), proto(p){}
@@ -92,6 +93,7 @@ struct Jua_Val{
     virtual bool toBoolean(){ return true; }
     virtual Jua_Bool* toJuaBool();
     virtual int64_t toInt(); //仅用于数字
+    virtual double toNumber(); //仅用于数字
     virtual string getTypeName() = 0;
     virtual void gc();
 };
@@ -164,6 +166,7 @@ struct Jua_Num: Jua_Val{
     string toString();
     bool toBoolean(){ return value; }
     int64_t toInt(){ return std::round(value); }
+    double toNumber(){ return value; }
     string getTypeName(){ return "number"; }
 };
 struct Jua_Str: Jua_Val{
@@ -218,7 +221,7 @@ struct Jua_NativeFunc: Jua_Func{
 struct Jua_Array: Jua_Obj{
     static const int type_id = 2;
     jualist items;
-    Jua_Array(JuaVM* vm_, const jualist& list): Jua_Obj(vm_), items(list){}
+    Jua_Array(JuaVM*, const jualist&);
     bool isType(int type_id) override {
         return type_id == Jua_Array::type_id;
     }
@@ -229,9 +232,7 @@ struct Jua_Buffer: Jua_Obj{
     static const int type_id = 3;
     uint8_t* bytes;
     size_t length;
-    Jua_Buffer(JuaVM* vm_, size_t len): Jua_Obj(vm_), length(len){
-        bytes = new uint8_t[len];
-    }
+    Jua_Buffer(JuaVM*, size_t);
     ~Jua_Buffer(){ delete bytes; }
     bool isType(int type_id) override {
         return type_id == Jua_Buffer::type_id;

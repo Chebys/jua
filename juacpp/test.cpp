@@ -46,7 +46,7 @@ struct JuaRuntime: JuaVM{
         cout << str << '\n';
     };
     void j_stderr(JuaError* err){
-        cout << err->toDebugString() << '\n';
+        cout << "j_stderr: " << err->toDebugString() << '\n';
     }
 };
 

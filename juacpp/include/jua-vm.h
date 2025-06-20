@@ -4,6 +4,7 @@ struct JuaVM{
     std::unordered_map<string, Jua_Val*> modules;
 
     Scope* _G;
+    Jua_Obj* classProto;
     Jua_Obj* StringProto;
     Jua_Obj* NumberProto;
     Jua_Obj* BooleanProto;
@@ -13,6 +14,8 @@ struct JuaVM{
     Jua_Obj* BufferProto;
     Jua_Obj* RangeProto;
 
+    Jua_NativeFunc* obj_new;
+    Jua_NativeFunc* obj_hasOwn;
     Jua_NativeFunc* obj_next;
 
     JuaVM();
@@ -21,14 +24,7 @@ struct JuaVM{
         for(auto& [name, val]: modules){
             val->release();
         }
-        delete StringProto;
-        delete NumberProto;
-        delete BooleanProto;
-        delete FunctionProto;
-        delete ObjectProto;
-        delete ArrayProto;
-        delete BufferProto;
-        delete RangeProto;
+        //todo: 释放所有值
     }
     void run(const string&);
     Jua_Val* eval(const string&); //不捕获错误
@@ -42,7 +38,17 @@ struct JuaVM{
     Jua_NativeFunc* makeFunc(Jua_NativeFunc::Native fn){
         return new Jua_NativeFunc(this, fn);
     }
+    Jua_Obj* buildClass(Jua_NativeFunc::Native constructor);
+    Jua_Obj* makeRangeProto();
+    Jua_Obj* makeNumberProto();
+    Jua_Obj* makeStringProto();
+    Jua_Obj* makeObjectProto();
 
     private:
+    size_t idcounter = 0;
     Jua_Val* require(const string& name);
+    typedef void Encoder(double, string&);
+    typedef double Decoder(const string&);
+    Jua_NativeFunc* makeEncodeFunc(Encoder);
+    Jua_NativeFunc* makeDecodeFunc(Decoder);
 };

@@ -103,6 +103,9 @@ Jua_Bool* Jua_Val::toJuaBool(){
 int64_t Jua_Val::toInt(){
     throw new JuaTypeError("toInt() called on a non-number value");
 }
+double Jua_Val::toNumber(){
+    throw new JuaTypeError("toNumber() called on a non-number value");
+}
 
 void Jua_Val::gc(){
     if(!ref){
@@ -113,6 +116,10 @@ void Jua_Val::gc(){
 
 Jua_Obj::Jua_Obj(JuaVM* vm_, Jua_Obj* p): Jua_Val(vm_, Obj, p){ if(p)p->addRef(); }
 Jua_Obj::~Jua_Obj(){ if(proto)proto->release(); }
+bool Jua_Obj::hasOwn(Jua_Val* key){
+    if(key->type != Str)throw new JuaError("non-string key");
+    return dict.contains(key->toString());
+}
 void Jua_Obj::setProp(const string& key, Jua_Val* val){
     if(dict.contains(key)){
         dict[key]->release();
@@ -236,7 +243,7 @@ size_t correctIndex(Jua_Val* num, size_t len){
     return index % len;
 }
 
-Jua_Str::Jua_Str(JuaVM* vm_, const string& v): Jua_Val(vm_, Str, vm_->StringProto), value(v){}
+Jua_Str::Jua_Str(JuaVM* vm, const string& v): Jua_Val(vm, Str, vm->StringProto), value(v){}
 Jua_Bool* Jua_Str::hasItem(Jua_Val* val){
     if(val->type!=Str)return Jua_Bool::getInst(false);
     return Jua_Bool::getInst(value.find(val->toString()) != string::npos);
@@ -261,6 +268,7 @@ Jua_Val* Scope::inheritProp(const string& key){
     return nullptr;
 }
 
+Jua_Array::Jua_Array(JuaVM* vm, const jualist& list): Jua_Obj(vm, vm->ArrayProto), items(list){}
 Jua_Val* Jua_Array::getItem(Jua_Val* key){
     size_t i = correctIndex(key, items.size());
     return items[i];
@@ -270,6 +278,9 @@ void Jua_Array::setItem(Jua_Val* key, Jua_Val* val){
     items[i] = val;
 }
 
+Jua_Buffer::Jua_Buffer(JuaVM* vm, size_t len):Jua_Obj(vm, vm->BufferProto), length(len){
+    bytes = new uint8_t[len];
+}
 Jua_Val* Jua_Buffer::getItem(Jua_Val* key){
     size_t i = correctIndex(key, length);
     return new Jua_Num(vm, bytes[i]);

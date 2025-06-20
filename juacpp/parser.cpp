@@ -461,6 +461,7 @@ bool ScriptReader::skipComment(){
 Expr* parsePrimaryTail(Expr*, TokensReader&);
 Expr* parseExpr(TokensReader&);
 Expr* parseFunc(TokensReader& reader);
+Expr* parseBinExpr(TokensReader& reader, Expr* start);
 Expr* parseObj(TokensReader& reader);
 Stmts parseStatements(TokensReader& reader);
 Block* parseBlockOrStatement(TokensReader& reader);
@@ -551,7 +552,7 @@ Expr* parsePrimary(TokensReader& reader){
             auto elseExpr = parseExpr(reader);
             return new TernaryExpr(cond, expr, elseExpr);
         }
-        throw unexpected(start->str);
+        throw unexpected(start->str, "<primary>");
     }
     case Token::NUM:{
         return parsePrimaryTail(LiteralNum::eval(start->str), reader);
@@ -600,7 +601,7 @@ Expr* parsePrimary(TokensReader& reader){
         return new UnitaryExpr(uniOpers[start->str], parsePrimary(reader));
     }
     default:
-        throw unexpected(start->str);
+        throw unexpected(start->str, "<primary>");
     }
 }
 Expr* parsePrimaryTail(Expr* start, TokensReader& reader){
@@ -653,9 +654,7 @@ Expr* parseExpr(TokensReader& reader){
     auto next = reader.preview();
     if(!next)return start;
     if(next->isBinop){
-        reader.read();
-        //todo: 优先级
-        return new BinaryExpr(binOpers[next->str], start, parseExpr(reader));
+        return parseBinExpr(reader, start);
     }else if(next->str == "="){
         reader.read();
         auto left = dynamic_cast<LeftValue*>(start);
@@ -669,6 +668,35 @@ Expr* parseExpr(TokensReader& reader){
     return start;
 }
 
+Expr* parseBinExpr(TokensReader& reader, Expr* start){
+    std::vector<Expr*> exprstack;
+    std::vector<BinOper> operstack;
+
+    exprstack.push_back(start);
+    auto combineExpr = [&](int priority = 0) {
+        while(!operstack.empty()) {
+            BinOper oper = operstack.back();
+            if(binOperPriority[oper] < priority) return;
+            operstack.pop_back();
+            Expr* right = exprstack.back(); exprstack.pop_back();
+            Expr* left = exprstack.back(); exprstack.pop_back();
+            exprstack.push_back(new BinaryExpr(oper, left, right));
+        }
+    };
+
+    while(true){
+        Token* next = reader.preview();
+        if(!next || !next->isBinop) break;
+        reader.read();
+        auto oper = binOpers[next->str];
+        combineExpr(binOperPriority[oper]);
+        operstack.push_back(oper);
+        Expr* pri = parsePrimary(reader);
+        exprstack.push_back(pri);
+    }
+    combineExpr();
+    return exprstack[0];
+}
 std::pair<Expr*, Expr*> parseProp(TokensReader& reader){
     Expr *key, *val;
 	auto start = reader.read();
@@ -838,7 +866,7 @@ Statement* parseStatement(TokensReader& reader){
             auto body = parseBlockOrStatement(reader);
             return new ForStmt(declarable, iterable, body);
         }
-        throw unexpected(start->str);
+        throw unexpected(start->str, "<statement>");
     }
     auto expr =  parseExpr(reader);
     return new ExprStatement(expr);

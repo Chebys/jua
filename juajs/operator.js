@@ -24,20 +24,20 @@ export const binOperator = {
 			return v1.div(v2);
 		}
 	},
+	'%': {
+		priority: 10
+	},
 	'+': {
-		priority: 10,
+		priority: 9,
 		fn(v1, v2){
 			return v1.add(v2);
 		}
 	},
 	'-': {
-		priority: 10,
+		priority: 9,
 		fn(v1, v2){
 			return v1.sub(v2);
 		}
-	},
-	'%': {
-		priority: 9
 	},
 	'..': {
 		priority: 7,
@@ -75,18 +75,6 @@ export const binOperator = {
 			return v1.lt(v2).toBoolean() ? Jua_Bool.false : Jua_Bool.true;
 		}
 	},
-	'==': {
-		priority: 5,
-		fn(v1, v2){
-			return v1.eq(v2);
-		}
-	},
-	'!=': {
-		priority: 5,
-		fn(v1, v2){
-			return v1.equalTo(v2) ? Jua_Bool.false : Jua_Bool.true;
-		}
-	},
 	'in': {
 		priority: 5,
 		fn(v1, v2){
@@ -97,6 +85,18 @@ export const binOperator = {
 		priority: 5,
 		fn(v1, v2){
 			return v1.isInst(v2) ? Jua_Bool.true : Jua_Bool.false;
+		}
+	},
+	'==': {
+		priority: 5,
+		fn(v1, v2){
+			return v1.eq(v2);
+		}
+	},
+	'!=': {
+		priority: 5,
+		fn(v1, v2){
+			return v1.equalTo(v2) ? Jua_Bool.false : Jua_Bool.true;
 		}
 	},
 	'&&': {
@@ -110,7 +110,7 @@ export const binOperator = {
 		}
 	},
 	'||': {
-		priority: 3,
+		priority: 2,
 		circuited: true,
 		fn(env, e1, e2){
 			let v1 = e1.calc(env);

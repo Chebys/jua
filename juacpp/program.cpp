@@ -27,6 +27,7 @@ Jua_Val* Keyword::calc(Scope* env){
         case 'f': return Jua_Bool::getInst(false);
         case 'l': return env;
     }
+    throw "Keyword::calc";
 }
 Keyword* Keyword::null = new Keyword('n');
 Keyword* Keyword::t = new Keyword('t');
@@ -61,9 +62,21 @@ void DeclarationItem::addDefault(){
     if(!initval)initval = Keyword::null;
     body->addDefault();
 }
+void DeclarationItem::assign(Scope* env, Jua_Val* val){
+    if(!val)val = initval->calc(env);
+    body->assign(env, val);
+}
 void DeclarationItem::declare(Scope* env, Jua_Val* val){
     if(!val)val = initval->calc(env);
     body->declare(env, val);
+}
+
+void DeclarationList::assign(Scope *env, Jua_Val *val){
+    //需要迭代器
+    throw "todo: DeclarationList::assign";
+}
+void DeclarationList::declare(Scope *env, Jua_Val *val){
+    throw "todo: DeclarationList::declare";
 }
 void DeclarationList::rawDeclare(Scope* env, const jualist& vals){
     for(size_t i=0; i<decItems.size(); i++){
@@ -88,7 +101,7 @@ Jua_Val* OptionalPropRef::calc(Scope* env){
 Jua_Val* PropRef::calc(Scope* env){
     auto val = _calc(env);
     if(val)return val;
-    throw "no property";
+    throw new JuaError(std::format("no property: {}", prop));
 }
 void PropRef::assign(Scope* env, Jua_Val* val){
     auto tar = expr->calc(env);
@@ -99,7 +112,7 @@ void PropRef::assign(Scope* env, Jua_Val* val){
 Jua_Val* MethWrapper::calc(Scope* env){
     auto obj = expr->calc(env);
     auto meth = obj->getProp(key);
-    if(!meth)throw "no method";
+    if(!meth)throw new JuaError(std::format("no method: {}", key));
     return new Jua_NativeFunc(env->vm, [obj, meth](jualist& args){
         args.push_front(obj);
         return meth->call(args);
@@ -157,7 +170,6 @@ Jua_Val* OperAssignment::calc(Scope* env){
     assignee->assign(env, result);
     return result;
 }
-
 Jua_Val* TernaryExpr::calc(Scope* env){
     auto cond = condExpr->calc(env);
     if(cond->toBoolean())
@@ -165,6 +177,33 @@ Jua_Val* TernaryExpr::calc(Scope* env){
     else
         return falseExpr->calc(env);
 }
+
+void LeftObj::addDefault(){
+    if(auto_nulled)return;
+    for(auto entry: entries){
+        entry.second->addDefault();
+    }
+    auto_nulled = true;
+}
+void LeftObj::assign(Scope* env, Jua_Val* val){
+    forEach(env, val, DeclarationItem::assign); //& ?
+}
+void LeftObj::declare(Scope* env, Jua_Val* val){
+    forEach(env, val, DeclarationItem::declare);
+}
+void LeftObj::forEach(Scope *env, Jua_Val *obj, Callback cb){
+    for(auto [keyExpr, decItem]: entries){
+        auto key = keyExpr->calc(env);
+        if(key->type != Jua_Val::Str)
+            throw new JuaError("non-string key");
+        auto val = obj->getProp(key->toString());
+        if(val || decItem->initval)
+            (decItem->*cb)(env, val);
+        else
+            throw new JuaError(std::format("cannot read property: {}", key->toString()));
+    }
+}
+
 
 void Return::exec(Scope* env, Controller* ctrl){
     ctrl->retval = expr ? expr->calc(env) : Jua_Null::getInst();

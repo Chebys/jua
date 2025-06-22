@@ -1,4 +1,4 @@
-import {Scope, Jua_Null, Jua_Num, Jua_Str, Jua_Bool, Jua_Obj, Jua_Array, Jua_Func, Jua_NativeFunc, Jua_Buffer} from 'jua/value';
+import {Scope, Jua_Null, Jua_Num, Jua_Str, Jua_Bool, Jua_Obj, Jua_Array, Jua_Func, Jua_NativeFunc, Jua_Buffer, JuaError} from 'jua/value';
 import {buildClass} from 'jua/builtin';
 import parse from 'jua/parser';
 import JuaProcess from 'jua/process';
@@ -36,6 +36,7 @@ function assign(juaObj, jsObj){
 export {
 	JSToJua, buildClass, assign,
 	Jua_Null, Jua_Num, Jua_Str, Jua_Bool, Jua_Obj, Jua_NativeFunc,
+	JuaError,
 	parse,
 	JuaProcess
 };

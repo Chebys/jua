@@ -35,7 +35,7 @@ class Expression{ //抽象类
 	}
 }
 class LeftValue{ //抽象类
-	assign(env, val){
+	assign(env, val){ //val必须是jua值
 		throw new Error("pure virtual function");
 	}
 }
@@ -197,7 +197,7 @@ class Varname extends Expression{ //Declarable
 	addDefault(){} //dummy
 }
 
-class OptionalPropRef extends Expression{ //LeftValue
+class OptionalPropRef extends Expression{
 	constructor(expr, prop){
 		//prop为js字符串
 		super();
@@ -215,7 +215,7 @@ class OptionalPropRef extends Expression{ //LeftValue
 		return this._calc(env) || Jua_Null.inst;
 	}
 }
-class PropRef extends OptionalPropRef{
+class PropRef extends OptionalPropRef{ //LeftValue
 	calc(env){
 		let val = this._calc(env);
 		return env.trackExpr(this, ()=>{
@@ -225,7 +225,11 @@ class PropRef extends OptionalPropRef{
 		});
 	}
 	assign(env, val){
-		this.expr.calc(env).setProp(this.prop, val);
+		env.trackExpr(this, ()=>{
+			let obj = this.expr.calc(env);
+			if(obj.type!='object')throw new JuaTypeError('not an obj');
+			obj.setProp(this.prop, val);
+		});
 	}
 }
 class MethWrapper extends Expression{
@@ -248,9 +252,11 @@ class MethWrapper extends Expression{
 		});
 	}
 }
-class Subscription extends BinaryExpr{ //LeftValue
+class Subscription extends Expression{ //LeftValue
 	constructor(expr, key){
-		super('subscript', expr, key);
+		super();
+		this.left = expr;
+		this.right = key;
 	}
 	calc(env){
 		let obj = this.left.calc(env);
@@ -411,7 +417,7 @@ class LeftObj extends Declarable{
 	auto_nulled = false;
 	constructor(entries){
 		super();
-		this.entries = entries; //每一项均为[key:右值, DeclarationItem]
+		this.entries = entries; //每一项均为[key:Expression, DeclarationItem]
 	}
 	addDefault(){
 		if(this.auto_nulled)
@@ -587,6 +593,7 @@ class WhileStatement extends Statement{
 		while(this.cond.calc(env).toBoolean()){
 			this.block.exec(new Scope(env), controller);
 			controller.resolve('continue');
+			//todo: return
 			if('break' in controller.pending){
 				controller.resolve('break');
 				break;

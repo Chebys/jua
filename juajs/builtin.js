@@ -67,7 +67,7 @@ Jua_Obj.proto.setProp('setProto', new Jua_NativeFunc((obj, proto)=>{
 		obj.proto = null;
 }));
 Jua_Obj.proto.setProp('getProto', new Jua_NativeFunc(obj => obj?.proto || Jua_Null.inst));
-Jua_Obj.proto.setProp('iter', new Jua_NativeFunc((obj, key)=>{ //不建议使用，性能较低
+Jua_Obj.proto.setProp('next', new Jua_NativeFunc((obj, key)=>{ //不建议使用，性能较低
 	if(!(obj instanceof Jua_Obj))
 		throw new JuaTypeError('Expect object');
 	if(key instanceof Jua_Str)
@@ -117,7 +117,7 @@ Jua_Num.proto.setProp('toString', new Jua_NativeFunc((num, radix)=>{
 		throw new JuaTypeError('Expect number');
 	return new Jua_Str(num.value.toString(radix ? radix.toInt() : 10));
 }));
-Jua_Num.proto.setProp('range',  new Jua_NativeFunc((v1, v2)=>{
+Jua_Num.proto.setProp('__range',  new Jua_NativeFunc((v1, v2)=>{
 	if(!(v1 instanceof Jua_Num))
 		throw new JuaTypeError('Expect number');
 	return v1.range(v2);
@@ -266,9 +266,19 @@ Jua_Array.proto.setProp('getItem', new Jua_NativeFunc((arr, i)=>{
 		throw new JuaTypeError('Expect array');
 	return arr.getItem(i || Jua_Null.inst);
 }));
+Jua_Array.proto.setProp('setItem', new Jua_NativeFunc((arr, i, val)=>{
+	if(!(arr instanceof Jua_Array))
+		throw new JuaTypeError('Expect array');
+	arr.setItem(i || Jua_Null.inst, val || Jua_Null.inst);
+}));
+Jua_Array.proto.setProp('len', new Jua_NativeFunc((arr, i)=>{
+	if(!(arr instanceof Jua_Array))
+		throw new JuaTypeError('Expect array');
+	return new Jua_Num(arr.items.length);
+}));
 
 Jua_Num.rangeProto.proto = classProto;
-Jua_Num.rangeProto.setProp('iter', new Jua_NativeFunc((self, key)=>{
+Jua_Num.rangeProto.setProp('next', new Jua_NativeFunc((self, key)=>{
 	if(key instanceof Jua_Num)
 		key = key.add(new Jua_Num(1));
 	else

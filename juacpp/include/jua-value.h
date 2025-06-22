@@ -153,7 +153,7 @@ struct Jua_Bool: Jua_Val{
 };
 struct Jua_Num: Jua_Val{
     double value;
-    Jua_Num(JuaVM* vm_, double v): Jua_Val(vm_, Num), value(v){}
+    Jua_Num(JuaVM* vm, double v);
     Jua_Val* unm();
     Jua_Val* add(Jua_Val*);
     Jua_Val* sub(Jua_Val*);
@@ -247,7 +247,7 @@ struct JuaError{
     string message;
     JuaError(string msg): message(msg){}
     JuaError(): JuaError("Unknown JuaError"){}
-    virtual string toDebugString(){ return "JuaError"; }
+    virtual string toDebugString();
 };
 struct JuaErrorWithVal: JuaError{
     Jua_Val* val;

@@ -84,6 +84,9 @@ namespace JuaParser{
 bool validWordStart(char c){
     return 'a'<=c && c<='z' || 'A'<=c && c<='Z' || c=='_';
 }
+bool isHex(char c){
+    return '0'<=c && c<='9' || 'a'<=c && c<='f' || 'A'<=c && c<='F';
+}
 
 string missing(char c){
     if(c=='\'')return "Missing \"'\"";
@@ -107,7 +110,7 @@ string unexpected(string une, string e){
 }
 
 struct Token{
-    enum Type{SEP, UNIOP, BINOP, WORD, NUM, STR, DQ_STR, PAREN, BRAKET, BRACE};
+    enum Type{SEP, UNIOP, BINOP, WORD, NUM, STR, DQ_STR, PAREN, BRACKET, BRACE};
     Type type;
     string str; //用于 STR 时，储存实际值
     bool isKeyword;
@@ -138,7 +141,7 @@ struct TokensReader{
         if(next)return next->str;
         return "";
     }
-    void assetStr(const string& str){
+    void assertStr(const string& str){
         auto token = read();
 		if(token->str != str)
 			throw unexpected(token->str, str);
@@ -276,7 +279,7 @@ struct ScriptReader: TokensReader{
             forward();
             while(!eof()){
                 char next = script[pos];
-                if('0'<=next&&next<='9'||'a'<=next&&next<='f'||'A'<=next&&next<='F'){
+                if(isHex(next)){
                     forward();
                     num.push_back(next);
                 }
@@ -321,7 +324,7 @@ struct ScriptReader: TokensReader{
     }
     Token* readSymbol(char start){
         if(start=='(')return new Enclosure(Token::PAREN, readUntil(')'));
-        if(start=='[')return new Enclosure(Token::BRAKET, readUntil(']'));
+        if(start=='[')return new Enclosure(Token::BRACKET, readUntil(']'));
         if(start=='{')return new Enclosure(Token::BRACE, readUntil('}'));
         string str(1, start);
         if(sym3.contains(str.append(substr(2)))){
@@ -339,7 +342,14 @@ struct ScriptReader: TokensReader{
     char escape(bool allow_newline=false){
         //从 `\` 后开始读取
         char c = readChar();
-        if(c=='x' || c=='u')throw "todo: \\x";
+        if(c=='x'){
+            auto hex = substr(2);
+            size_t len;
+            uint8_t byte = std::stoi(hex, &len, 16);
+            if(len != 2)throw new JuaError(unexpected(hex));
+            forwardx(2);
+            return byte;
+        }else if(c=='u')throw "todo: \\u";
         else if('0'<=c && c<='9')throw "todo: \\0";
         else if(c=='\n' && !allow_newline)throwError("cannot wrap inside SQ string");
         else if(escape_map.contains(c))return escape_map[c];
@@ -465,11 +475,7 @@ Expr* parseBinExpr(TokensReader& reader, Expr* start);
 Expr* parseObj(TokensReader& reader);
 Stmts parseStatements(TokensReader& reader);
 Block* parseBlockOrStatement(TokensReader& reader);
-Declarable* parseDeclarable(TokensReader& reader){
-    auto next = reader.read();
-    if(next->isValidVarname)return new Varname(next->str);
-    throw "todo: parseDeclarable";
-}
+Declarable* parseDeclarable(TokensReader& reader);
 DeclarationItem* parseDecItem(TokensReader& reader){
     Declarable* declarable = parseDeclarable(reader);
 	Expr* defval = nullptr;
@@ -503,8 +509,22 @@ DeclarationList* parseFlexDecList(TokensReader& reader){
         if(reader.end())return new DeclarationList(items);
         items.push_back(parseDecItem(reader));
         if(reader.end())return new DeclarationList(items);
-        reader.assetStr(",");
+        reader.assertStr(",");
     }
+}
+Declarable* parseLeftObj(TokensReader& reader);
+Declarable* parseDeclarable(TokensReader& reader){
+    auto next = reader.read();
+    if(next->isValidVarname)return new Varname(next->str);
+    if(next->type == Token::BRACKET){
+        auto cl = static_cast<Enclosure*>(next);
+        return parseFlexDecList(cl->reader);
+    }
+    if(next->type == Token::BRACE){
+        auto cl = static_cast<Enclosure*>(next);
+        return parseLeftObj(cl->reader);
+    }
+    throw new JuaError(unexpected(next->str));
 }
 
 Expr* parseCond(TokensReader& reader){
@@ -524,7 +544,7 @@ FlexibleList* parseFlexExprList(TokensReader& reader){
         if(reader.end())return new FlexibleList(exprs);
         exprs.push_back(parseExpr(reader));
         if(reader.end())return new FlexibleList(exprs);
-        reader.assetStr(",");
+        reader.assertStr(",");
     }
 }
 Expr* parsePrimary(TokensReader& reader){
@@ -548,7 +568,7 @@ Expr* parsePrimary(TokensReader& reader){
         if(start->str=="if"){
             auto cond = parseCond(reader);
             auto expr = parseExpr(reader);
-            reader.assetStr("else");
+            reader.assertStr("else");
             auto elseExpr = parseExpr(reader);
             return new TernaryExpr(cond, expr, elseExpr);
         }
@@ -585,7 +605,7 @@ Expr* parsePrimary(TokensReader& reader){
         auto expr = parseObj(cl->reader);
         return parsePrimaryTail(expr, reader);
     }
-    case Token::BRAKET:{
+    case Token::BRACKET:{
         auto cl = static_cast<Enclosure*>(start);
         ArrayExpr* arr;
         if(cl->reader.end())
@@ -636,7 +656,7 @@ Expr* parsePrimaryTail(Expr* start, TokensReader& reader){
             auto call = new Call(start, args);
             return parsePrimaryTail(call, reader);
         }
-        case Token::BRAKET:{
+        case Token::BRACKET:{
             reader.read();
             auto cl = static_cast<Enclosure*>(next);
 			auto key = parseExpr(cl->reader);
@@ -713,7 +733,7 @@ std::pair<Expr*, Expr*> parseProp(TokensReader& reader){
 		}else{
 			throw "Invalid Varname";
 		}
-	}else if(start->type==Token::BRAKET){
+	}else if(start->type==Token::BRACKET){
         auto cl = static_cast<Enclosure*>(start);
 		key = parseExpr(cl->reader);
 		cl->reader.assetEnd();
@@ -742,7 +762,7 @@ Expr* parseObj(TokensReader& reader){
 		entries.push_back(parseProp(reader));
 		if(reader.end())
 			return new ObjExpr(entries);
-		reader.assetStr(",");
+		reader.assertStr(",");
 	}
 }
 Expr* parseFunc(TokensReader& reader){
@@ -764,6 +784,57 @@ Expr* parseFunc(TokensReader& reader){
 		throw unexpected(next->str);
 	}
 	return new FunExpr(decList, stmts);
+}
+std::pair<Expr*, DeclarationItem*> parseLeftProp(TokensReader& reader){
+    Expr* key;
+    DeclarationItem* decItem;
+	auto next = reader.read();
+	if(next->type==Token::WORD){
+		string name = next->str;
+		key = new LiteralStr(name);
+		next = reader.preview();
+		if(next){
+			if(next->str=="?"){
+				reader.read();
+				decItem = new DeclarationItem(new Varname(name), Keyword::null);
+			}else if(next->str=="="){
+				reader.read();
+				decItem = new DeclarationItem(new Varname(name), parseExpr(reader));
+			}else if(next->str=="as"){
+				reader.read();
+				decItem = parseDecItem(reader);
+			}else{
+				decItem = new DeclarationItem(new Varname(name));
+			}
+		}else{
+			decItem = new DeclarationItem(new Varname(name));
+		}
+	}else if(next->type==Token::BRACKET){
+        auto cl = static_cast<Enclosure*>(next);
+		key = parseExpr(cl->reader);
+		cl->reader.assetEnd();
+		reader.assertStr("as");
+		decItem = parseDecItem(reader);
+	}else{
+		throw new JuaError(unexpected(next->str));
+	}
+	return {key, decItem};
+}
+Declarable* parseLeftObj(TokensReader& reader){
+    //不可空，允许尾随逗号
+    //读完 reader
+    LeftObj::Entries entries;
+	while(true){
+		if(reader.end()){
+			if(!entries.size())
+				throw new JuaError("LeftObj cannot be empty");
+			return new LeftObj(entries);
+		}
+		entries.push_back(parseLeftProp(reader));
+		if(reader.end())
+			return new LeftObj(entries);
+		reader.assertStr(",");
+	}
 }
 
 Statement* parseStatement(TokensReader& reader){
@@ -860,7 +931,7 @@ Statement* parseStatement(TokensReader& reader){
             if(next->type!=Token::PAREN)throw unexpected(next->str, "(...)");
             auto cl = static_cast<Enclosure*>(next);
             auto declarable = parseDeclarable(cl->reader);
-            cl->reader.assetStr("in");
+            cl->reader.assertStr("in");
             auto iterable = parseExpr(cl->reader);
             cl->reader.assetEnd();
             auto body = parseBlockOrStatement(reader);

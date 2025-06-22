@@ -275,6 +275,12 @@ Jua_Obj* JuaVM::makeNumberProto(){
     proto->setProp("decodeUint16", makeDecodeFunc(decode<uint16_t>));
     proto->setProp("encodeUint32", makeEncodeFunc(encode<uint32_t>));
     proto->setProp("decodeUint32", makeDecodeFunc(decode<uint32_t>));
+    proto->setProp("encodeInt8", makeEncodeFunc(encode<int8_t>));
+    proto->setProp("decodeInt8", makeDecodeFunc(decode<int8_t>));
+    proto->setProp("encodeInt16", makeEncodeFunc(encode<int16_t>));
+    proto->setProp("decodeInt16", makeDecodeFunc(decode<int16_t>));
+    proto->setProp("encodeInt32", makeEncodeFunc(encode<int32_t>));
+    proto->setProp("decodeInt32", makeDecodeFunc(decode<int32_t>));
     proto->setProp("encodeFloat32", makeEncodeFunc(encode<float>));
     proto->setProp("decodeFloat32", makeDecodeFunc(decode<float>));
     proto->setProp("encodeFloat64", makeEncodeFunc(encode<double>));
@@ -289,6 +295,14 @@ Jua_Obj* JuaVM::makeStringProto(){
         }
         return new Jua_Str(this, value);
     });
+    proto->setProp("fromByte", makeFunc([this](jualist& args){
+        string str;
+        str.reserve(args.size());
+        for(auto v: args){
+            str.push_back(v->toInt());
+        }
+        return new Jua_Str(this, str);
+    }));
     proto->setProp("len", makeFunc([](jualist& args){
         if(args.size() < 1)throw new JuaError("missing argument");
         auto val = args[0];
@@ -296,6 +310,23 @@ Jua_Obj* JuaVM::makeStringProto(){
             throw new JuaError("String.len() called on non-string value");
         auto str = static_cast<Jua_Str*>(val);
         return new Jua_Num(val->vm, str->value.size());
+    }));
+    proto->setProp("toHex", makeFunc([](jualist& args){
+        static const char hexDigits[] = "0123456789abcdef";
+
+        if(!args.size())throw new JuaError("String.toHex() requires at least 1 argument");
+        auto self = args[0];
+        if(self->type != Jua_Val::Str)throw new JuaError("String.toHex() called on non-string value");
+        auto str = self->toString();
+        string hexStr;
+        hexStr.reserve(str.size() * 3);
+        for (uint8_t byte: str) {
+            hexStr.push_back(hexDigits[byte >> 4]);  // 高4位
+            hexStr.push_back(hexDigits[byte & 0x0F]); // 低4位
+            hexStr.push_back(' ');
+        }
+        hexStr.pop_back();
+        return new Jua_Str(self->vm, hexStr);
     }));
     return proto;
 }

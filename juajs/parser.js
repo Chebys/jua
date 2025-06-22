@@ -99,7 +99,7 @@ class TokensReader{ //抽象类
 	previewStr(){ //读完时，返回 undefined
 		return this.preview()?.str;
 	}
-	assetStr(str){
+	assertStr(str){
 		let token = this.read();
 		if(token.str!=str)
 			throw new JuaSyntaxError(`Unexpected token: '${token.str}'; Expect '${str}'`);
@@ -305,7 +305,7 @@ class ScriptReader extends TokensReader{
 	}
 	readDQStr(){
 		//从 " 或 } 之后开始读取，到插值表达式或模板结束为止
-		//返回[String, Enclosure?]
+		//返回[String, Token?]，其中 Token 可能为 '{}' 或 'word'，null 表示结束
 		//返回的字符串未经过反转义、不含两端双引号、不含插值标志，可能为空
 		let str = this.match(/([^\\$"]|\\.)*/y); //可以换行
 		if(this.eof())
@@ -374,7 +374,9 @@ function parseStatement(reader){
 		switch(start.str){
 			case 'return':{
 				reader.read();
-				let expr = parseExpr(reader); //todo: 省略返回值
+				if(reader.skipStr(';'))
+					return new Return;
+				let expr = parseExpr(reader);
 				reader.skipStr(';');
 				return new Return(expr);
 			}
@@ -465,7 +467,7 @@ function parseCond(reader){
 		expr = parseExpr(head.reader);
 		head.reader.assetEnd();
 	}else if(head.str=='!'){
-		expr =  new UnitaryExpr('!', parseClosedExpr(reader));
+		expr = new UnitaryExpr('!', parseClosedExpr(reader));
 	}else{
 		throw new JuaSyntaxError('Unexpected token: '+head);
 	}
@@ -477,7 +479,7 @@ function parseForStmt(reader){
 	if(head.type != '()')
 		throw new JuaSyntaxError("Missing '('");
 	let declarable = parseDeclarable(head.reader);
-	head.reader.assetStr('in');
+	head.reader.assertStr('in');
 	let iterable = parseExpr(head.reader);
 	head.reader.assetEnd();
 	let block = parseBlockOrStatement(reader);
@@ -509,6 +511,7 @@ function parseClosedExpr(reader, type='()'){ //括号包围的表达式，从 re
 }
 function parseExpr(reader){
 	let head, headToken = reader.preview();
+	if(!headToken)throw new JuaSyntaxError('Unfinished input');
 	if(headToken.type == '[]'){
 		reader.read();
 		if(reader.previewStr() == '='){
@@ -592,7 +595,7 @@ function parsePrimary(reader){ //初等表达式，可以是一元运算符+初�
 			}else if(str == 'if'){
 				let cond = parseCond(reader);
 				let expr = parseExpr(reader);
-				if(reader.readStr()!='else')throw new JuaSyntaxError("Missing 'else'");
+				reader.assertStr('else');
 				let elseExpr = parseExpr(reader);
 				return new TernaryExpr(cond, expr, elseExpr);
 			}else if(str == 'local'){
@@ -628,14 +631,14 @@ function parsePrimary(reader){ //初等表达式，可以是一元运算符+初�
 			if(value.reader.end())
 				expr = new ArrayExpr([]);
 			else{
-				expr = parseFlexExprList(value.reader);
+				expr = new ArrayExpr(parseFlexExprList(value.reader));
 				value.reader.assetEnd();
 			}
 			return parsePrimaryTail(expr, reader);
 		}
 		case '{}':{
 			let expr = parseObj(value.reader);
-			console.log(reader.preview())
+			//console.log(reader.preview())
 			return parsePrimaryTail(expr, reader);
 		}
 		case 'uniop':
@@ -643,7 +646,6 @@ function parsePrimary(reader){ //初等表达式，可以是一元运算符+初�
 		default:
 			throw new JuaSyntaxError('Unexpected token: '+str);
 	}
-	
 }
 function parsePrimaryTail(head, reader){
 	//head 为 Expression
@@ -726,7 +728,7 @@ function parseFlexExprList(reader){
 		}
 		if(reader.end())
 			return list;
-		reader.assetStr(',');
+		reader.assertStr(',');
 	}
 }
 function parseFlexDecList(reader){
@@ -743,7 +745,7 @@ function parseFlexDecList(reader){
 		items.push(parseDecItem(reader));
 		if(reader.end())
 			return new DeclarationList(items);
-		reader.assetStr(',');
+		reader.assertStr(',');
 	}
 }
 function parseDecList(reader){
@@ -795,7 +797,7 @@ function parseObj(reader){
 		entries.push(parseProp(reader));
 		if(reader.end())
 			return new ObjExpr(entries);
-		reader.assetStr(',');
+		reader.assertStr(',');
 	}
 }
 function parseProp(reader){
@@ -844,7 +846,7 @@ function parseLeftObj(reader){
 		entries.push(parseLeftProp(reader));
 		if(reader.end())
 			return new LeftObj(entries);
-		reader.assetStr(',');
+		reader.assertStr(',');
 	}
 }
 function parseLeftProp(reader){
@@ -873,7 +875,7 @@ function parseLeftProp(reader){
 	}else if(next.type=='[]'){
 		key = parseExpr(next.reader);
 		next.reader.assetEnd();
-		reader.assetStr('as');
+		reader.assertStr('as');
 		decItem = parseDecItem(reader);
 	}else{
 		throw new JuaSyntaxError('Unexpected token: '+next.str);

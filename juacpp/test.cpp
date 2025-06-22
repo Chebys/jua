@@ -3,7 +3,7 @@
 #include <filesystem>
 #include "jua-vm.h"
 
-const char* default_module = "statements";
+const char* default_module = "coding";
 
 namespace fs = std::filesystem;
 using std::cout;

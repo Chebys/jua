@@ -20,12 +20,12 @@ struct DeclarationItem{
     void assign(Scope* env, Jua_Val* val);
     void declare(Scope* env, Jua_Val* val);
 };
-struct DeclarationList{
+struct DeclarationList: Declarable{
     //static DeclarationList* fromNames()
     std::deque<DeclarationItem*> decItems;
     DeclarationList(std::deque<DeclarationItem*> items): decItems(items){}
-    void assign(Scope* env, Jua_Val* val);
-    void declare(Scope* env, Jua_Val* val);
+    void assign(Scope* env, Jua_Val* val); //仅用于左值数组
+    void declare(Scope* env, Jua_Val* val); //仅用于左值数组
     void rawDeclare(Scope* env, const jualist&);
 };
 struct LiteralNum: Expr{
@@ -155,12 +155,24 @@ struct ArrayExpr: Expr{
     ArrayExpr(FlexibleList* exprs): list(exprs){}
 	Jua_Val* calc(Scope*);
 };
+struct LeftObj: Declarable{
+    bool auto_nulled = false;
+    typedef std::vector<std::pair<Expr*, DeclarationItem*>> Entries;
+    Entries entries;
+    LeftObj(Entries e): entries(e){}
+    void assign(Scope*, Jua_Val*);
+    void declare(Scope* env, Jua_Val* val);
+    void addDefault();
+    private:
+    typedef void (DeclarationItem::*Callback)(Scope*, Jua_Val*);
+    void forEach(Scope* env, Jua_Val* obj, Callback);
+};
 
 struct Controller{
     bool breaking = false;
     bool continuing = false;
     Jua_Val* retval = nullptr;
-    bool isPending() const {
+    bool isPending() {
         return breaking || continuing || retval;
     }
 };
@@ -299,4 +311,5 @@ struct JuaSyntaxError: JuaError{
         return std::format("JuaSyntaxError: {} at {}:{}", message, line, col);
     }
 };
+
 FunctionBody* parse(const string&);

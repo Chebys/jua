@@ -100,7 +100,7 @@ class Jua_Val{
 		throw 'Unable to le '+this;
 	}
 	range(val){
-		let rangeFn = this.getMetaMethod('range');
+		let rangeFn = this.getMetaMethod('__range');
 		if(rangeFn)
 			return rangeFn.call([this, val]);
 		throw 'Unable to range';
@@ -193,7 +193,7 @@ class Jua_Obj extends Jua_Val{
 			throw new JuaTypeError('key must be a string');
 	}
 	[Symbol.iterator](){
-		let iterFn = this.getMetaMethod('iter'); // || Jua_Obj.proto.getOwn('iter') 不建议使用，性能较低
+		let iterFn = this.getMetaMethod('next'); // || Jua_Obj.proto.getOwn('next') 不建议使用，性能较低
 		if(iterFn)
 			return new CustomIterator(this, iterFn);
 		let list = [];
@@ -254,37 +254,37 @@ class Jua_Num extends Jua_Val{
 	}
 	add(val){
 		if(!(val instanceof Jua_Num))
-			throw val+' is not a number';
+			throw new JuaTypeError(val+' is not a number');
 		return new Jua_Num(this.value + val.value);
 	}
 	sub(val){
 		if(!(val instanceof Jua_Num))
-			throw val+' is not a number';
+			throw new JuaTypeError(val+' is not a number');
 		return new Jua_Num(this.value - val.value);
 	}
 	mul(val){
 		if(!(val instanceof Jua_Num))
-			throw val+' is not a number';
+			throw new JuaTypeError(val+' is not a number');
 		return new Jua_Num(this.value * val.value);
 	}
 	div(val){
 		if(!(val instanceof Jua_Num))
-			throw val+' is not a number';
+			throw new JuaTypeError(val+' is not a number');
 		return new Jua_Num(this.value / val.value);
 	}
 	lt(val){
 		if(!(val instanceof Jua_Num))
-			throw val+' is not a number';
+			throw new JuaTypeError(val+' is not a number');
 		return this.value < val.value ? Jua_Bool.true : Jua_Bool.false;
 	}
 	le(val){
 		if(!(val instanceof Jua_Num))
-			throw val+' is not a number';
+			throw new JuaTypeError(val+' is not a number');
 		return this.value <= val.value ? Jua_Bool.true : Jua_Bool.false;
 	}
 	range(val){
 		if(!(val instanceof Jua_Num))
-			throw val+' is not a number';
+			throw new JuaTypeError(val+' is not a number');
 		let iter = new Jua_Obj(Jua_Num.rangeProto);
 		iter.setProp('start', this);
 		iter.setProp('end', val);
@@ -518,7 +518,7 @@ class JuaError extends Error{
 		this.jua_stack = [...stack];
 		//console.log(this.jua_stack)
 	}
-	toDebugString(){ //todo: 保证不报错（即使在toString元方法中）
+	toDebugString(){ //todo: 保证不报错（即使在 toString 元方法中）
 		let str = this.toString();
 		if(this.jua_stack)
 			for(let i=this.jua_stack.length-1; i>=0; i--)
@@ -588,13 +588,13 @@ class CustomIterator extends JuaIterator{
 	constructor(val, iterFn){
 		super();
 		this.target = val;
-		this.iter = iterFn||val.getMetaMethod('iter');
-		if(!this.iter)
+		this.iterFn = iterFn||val.getMetaMethod('next');
+		if(!this.iterFn)
 			throw new JuaTypeError('Uniterable: '+val);
 		this.key = Jua_Null.inst;
 	}
 	next(){ //不捕获错误，由调用者负责
-		let res = this.iter.call([this.target, this.key]);
+		let res = this.iterFn.call([this.target, this.key]);
 		let done = res.getOwn('done')||Jua_Null.inst;
 		if(done.toBoolean())
 			return {

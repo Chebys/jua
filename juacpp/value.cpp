@@ -1,5 +1,6 @@
 #include "jua-value.h"
 #include <charconv>
+#include <format>
 #include "jua-vm.h"
 
 void Jua_Val::release(){
@@ -181,9 +182,10 @@ string Jua_Obj::safeToString(){
     return str;
 }
 bool Jua_Obj::isPropTrue(const char* key){
-    throw "todo: Jua_Obj::isPropTrue";
+    return getProp(key) == Jua_Bool::getInst(true);
 }
 
+Jua_Num::Jua_Num(JuaVM* vm, double v): Jua_Val(vm, Num, vm->NumberProto), value(v){}
 Jua_Val* Jua_Num::unm(){
     return new Jua_Num(vm, -value);
 }
@@ -310,3 +312,9 @@ void Jua_Buffer::write(Jua_Val* _str, Jua_Val* _pos){
         throw "out of range";
     memcpy(bytes+pos, &str[0], len);
 }
+
+string JuaError::toDebugString(){
+    if(!message.size())return "JuaError";
+    return std::format("JuaError: {}", message);
+}
+

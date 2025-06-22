@@ -6,6 +6,22 @@
 <!--内置类的内置属性不应被改变，否则行为未定义。-->
 
 ## Object
+
+### Object.del
+### Object.entries(obj)
+### Object.get
+对值（未必是对象）进行属性访问
+### Object.getOwn
+### Object.getProto
+获取一个值（未必对象）的原型。
+### Object.hasOwn
+### Object.id
+用于获取引用类型值（包括对象和函数）的 id。
+
+满足：
+* id 是一个非负整数
+* 不同引用具有不同的 id
+### Object.keys(obj)
 ### Object.new(proto, *args)
 等效于
 
@@ -17,14 +33,6 @@
 		return obj
 	}
 
-### Object.get
-### Object.set
-### Object.del
-### Object.hasOwn
-### Object.setProto
-设置对象的原型。
-### Object.getProto
-获取一个值（未必对象）的原型。
 ### Object.next(obj, key)
 用于获取对象的“下一个”键。
 * 键的实际顺序取决于实现。
@@ -35,12 +43,9 @@
 
 本函数是对象的默认迭代函数。
 
-### Object.id
-用于获取引用类型值（包括对象和函数）的 id。
-
-满足：
-* id 是一个非负整数
-* 不同引用具有不同的 id
+### Object.set
+### Object.setProto
+设置对象的原型。
 ### Object.toString
 
 

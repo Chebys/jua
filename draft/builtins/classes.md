@@ -9,8 +9,9 @@
 
 ### Object.del
 ### Object.entries(obj)
-### Object.get
-对值（未必是对象）进行属性访问
+返回可迭代对象，可以产生对象自身的所有键值对（二元数组）
+### Object.get(obj, key, default=null)
+对 obj（未必是对象）进行属性访问
 ### Object.getOwn
 ### Object.getProto
 获取一个值（未必对象）的原型。
@@ -79,12 +80,18 @@ String 是所有字符串的原型。
 ## Boolean
 ## Function
 ## Array
-### Array.of(*items)
-### Array.join(self)
-### Array.toString(self)
+### Array.entries(self)
 ### Array.getItem(self, i)
-### Array.setItem(self, i)
+### Array.join(self, sep='')
 ### Array.len(self)
+### Array.pop(self)
+### Array.push(self, item)
+### Array.of(*items)
+### Array.resize(self, len)
+### Array.setItem(self, i)
+### Array.shift(self)
+### Array.toString(self)
+### Array.unshift(self, item)
 
 ## Buffer
 ### Buffer.read(self, start, end)

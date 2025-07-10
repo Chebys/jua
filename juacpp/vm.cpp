@@ -83,7 +83,7 @@ void JuaVM::initBuiltins(){
     FunctionProto = new Jua_Obj(this);
     ObjectProto = makeObjectProto();
 
-    ArrayProto = new Jua_Obj(this);
+    ArrayProto = makeArrayProto();
     BufferProto = new Jua_Obj(this);
 
 }
@@ -295,6 +295,19 @@ Jua_Obj* JuaVM::makeStringProto(){
         }
         return new Jua_Str(this, value);
     });
+    proto->setProp("byte", makeFunc([](jualist& args){
+        if(args.size() < 1)throw new JuaError("missing argument");
+        auto val = args[0];
+        if(val->type != Jua_Val::Str)
+            throw new JuaError("String.byte() called on non-string value");
+        auto self = static_cast<Jua_Str*>(val);
+        size_t index = 0;
+        if(args.size() >= 2){
+            index = args[1]->toInt() % self->value.length();
+        }
+        uint8_t byte = self->value[index];
+        return new Jua_Num(self->vm, byte);
+    }));
     proto->setProp("fromByte", makeFunc([this](jualist& args){
         string str;
         str.reserve(args.size());
@@ -455,4 +468,18 @@ Jua_NativeFunc* JuaVM::makeDecodeFunc(Decoder decode){
         }
         return new Jua_Num(this, result);
     });
+}
+
+Jua_Obj* JuaVM::makeArrayProto(){
+    auto proto = buildClass([this](jualist& args){
+        if(!args.size())throw new JuaError("Missing argument");
+        auto val = args[0];
+        auto arr = new Jua_Array(this, {});
+        throw "todo: 迭代";
+        return arr;
+    });
+    proto->setProp("of", makeFunc([this](jualist& args){
+        return new Jua_Array(this, args);
+    }));
+    return proto;
 }

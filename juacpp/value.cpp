@@ -240,9 +240,7 @@ string Jua_Num::toString(){
 }
 
 size_t correctIndex(Jua_Val* num, size_t len){
-    if(num->type!=Jua_Val::Num)throw new JuaTypeError("index must be a number");
-    size_t index = num->toInt();
-    return index % len;
+    return num->toInt() % len;
 }
 
 Jua_Str::Jua_Str(JuaVM* vm, const string& v): Jua_Val(vm, Str, vm->StringProto), value(v){}

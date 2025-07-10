@@ -130,6 +130,7 @@ struct FlexibleList{
     FlexibleList(std::vector<Expr*>& list): exprs(list){};
     FlexibleList(initializer_list<Expr*> list): exprs(list){};
     jualist calc(Scope*);
+    void appendTo(Scope*, jualist&);
     bool contains(Scope* env, Jua_Val* val){
         for(auto expr: exprs){
             if(*expr->calc(env) == val) return true;

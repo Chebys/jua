@@ -44,6 +44,8 @@ struct JuaVM{
     Jua_Obj* makeStringProto();
     Jua_Obj* makeObjectProto();
 
+    Jua_Obj* makeArrayProto();
+
     private:
     size_t idcounter = 0;
     Jua_Val* require(const string& name);

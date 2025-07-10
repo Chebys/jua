@@ -2,9 +2,13 @@
 #include <bitset>
 #include <unordered_set>
 using std::string;
-typedef std::bitset<256> CharSet;
+typedef std::bitset<128> CharSet;
 typedef std::unordered_set<string> StrSet;
 
+bool testChar(const CharSet& set, const char& c){
+    if(c & 0x80)return false;
+    return set.test(c);
+}
 static CharSet alphaChars = [](){
     CharSet alphaChars;
     for(char c='A'; c<='Z'; c++){
@@ -205,6 +209,7 @@ struct ScriptReader: TokensReader{
     Token* preview();
     private:
     void throwError(const string& msg){
+        //d_log(msg);
         throw JuaSyntaxError(msg, pos, line, col);
     }
     char readChar(){
@@ -233,7 +238,7 @@ struct ScriptReader: TokensReader{
         //若需要跳过多个空白符，则 while(skipWhite());
         if(eof())return false;
         char c = script[pos];
-        if(whiteChars.test(c)){
+        if(testChar(whiteChars, c)){
             forward(c=='\n');
             return true;
         }
@@ -250,7 +255,7 @@ struct ScriptReader: TokensReader{
         string word(1, start);
         while(!eof()){
             char c = script[pos];
-            if(wordChars.test(c)){
+            if(testChar(wordChars, c)){
                 forward();
                 word.push_back(c);
             }else{
@@ -265,7 +270,7 @@ struct ScriptReader: TokensReader{
         //读完时返回true
         while(!eof()){
             char next = script[pos];
-            if(!numChars.test(next))return false;
+            if(!testChar(numChars, next))return false;
             forward();
             start.push_back(next);
         }
@@ -289,7 +294,7 @@ struct ScriptReader: TokensReader{
         }
         if(readSimpleNum(num))return num;
         //此时非eof
-        if(script[pos]=='.' && pos+1<script.size() && numChars.test(script[pos+1])){
+        if(script[pos]=='.' && pos+1<script.size() && testChar(numChars, script[pos+1])){
             num.push_back('.');
             forward();
             if(readSimpleNum(num))return num;
@@ -299,7 +304,7 @@ struct ScriptReader: TokensReader{
             num.push_back('e');
             forward();
             char next = readChar();
-            if(next=='-' || numChars.test(next))num.push_back(next);
+            if(next=='-' || testChar(numChars, next))num.push_back(next);
             else throwError("Invalid number: expected '-' or digit after 'e'");
             readSimpleNum(num);
         }
@@ -398,7 +403,7 @@ Token* ScriptReader::doRead(){
     skipVoid();
     if(eof())return nullptr;
     char c = readChar();
-    if(symchars.test(c))
+    if(testChar(symchars, c))
         return readSymbol(c);
     else if(validWordStart(c))
         return readWord(c);

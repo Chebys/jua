@@ -50,11 +50,14 @@ void Varname::declare(Scope* env, Jua_Val* val){
     env->setProp(str, val);
 }
 
-jualist FlexibleList::calc(Scope* env){
-    jualist list;
+void FlexibleList::appendTo(Scope* env, jualist& list){
     for(auto expr: exprs){
         list.push_back(expr->calc(env));
     }
+}
+jualist FlexibleList::calc(Scope* env){
+    jualist list;
+    appendTo(env, list);
     return list;
 }
 
@@ -137,7 +140,9 @@ Jua_Val* Call::calc(Scope* env){
 }
 
 Jua_Val* ArrayExpr::calc(Scope* env){
-    return new Jua_Array(env->vm, list->calc(env));
+    auto arr = new Jua_Array(env->vm, {});
+    list->appendTo(env, arr->items); //避免复制
+    return arr;
 }
 Jua_Val* ObjExpr::calc(Scope* env){
     auto obj = new Jua_Obj(env->vm);

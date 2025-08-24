@@ -475,7 +475,7 @@ Jua_Obj* JuaVM::makeArrayProto(){
         if(!args.size())throw new JuaError("Missing argument");
         auto val = args[0];
         auto arr = new Jua_Array(this, {});
-        throw "todo: 迭代";
+        val->collectItems(arr->items);
         return arr;
     });
     proto->setProp("of", makeFunc([this](jualist& args){

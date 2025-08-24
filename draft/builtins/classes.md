@@ -9,9 +9,11 @@
 
 ### Object.del
 ### Object.entries(obj)
-返回可迭代对象，可以产生对象自身的所有键值对（二元数组）
+对象自身的所有键值对（二元数组）构成的数组
 ### Object.get(obj, key, default=null)
 对 obj（未必是对象）进行属性访问
+* 相比直接抽取，不会因为属性不存在而报错
+
 ### Object.getOwn
 ### Object.getProto
 获取一个值（未必对象）的原型。
@@ -43,6 +45,9 @@
 否则，设下一个键为 nextkey，返回`{done=false, key=nextkey, value=nextkey}`。
 
 本函数是对象的默认迭代函数。
+### Object.pairs(obj)
+返回可迭代对象，产生对象自身的所有键值对。
+* 相比 Object.entries 更加节省内存
 
 ### Object.set
 ### Object.setProto

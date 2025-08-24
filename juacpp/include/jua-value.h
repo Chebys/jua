@@ -23,6 +23,7 @@ struct Jua_Obj;
 struct Jua_Bool;
 struct Jua_Func;
 typedef std::deque<Jua_Val*> jualist;
+struct JuaIterator;
 
 void d_log(const string&);
 void d_log(char c);
@@ -87,6 +88,8 @@ struct Jua_Val{
     virtual Jua_Bool* le(Jua_Val*);
     virtual Jua_Val* range(Jua_Val*);
 
+    virtual JuaIterator* getIterator();
+    virtual void collectItems(jualist&); //仅用于可迭代对象
     virtual bool operator==(Jua_Val* val);
     virtual string toString() = 0; //const string& str = toString()
     virtual string safeToString(){ return toString(); }
@@ -227,6 +230,12 @@ struct Jua_Array: Jua_Obj{
     }
     Jua_Val* getItem(Jua_Val*);
     void setItem(Jua_Val*, Jua_Val*);
+    JuaIterator* getIterator() override;
+    void collectItems(jualist& list) override {
+        for(auto& item : items){
+            list.push_back(item);
+        }
+    }
 };
 struct Jua_Buffer: Jua_Obj{
     static const int type_id = 3;
@@ -243,6 +252,9 @@ struct Jua_Buffer: Jua_Obj{
     void write(Jua_Val* str, Jua_Val* pos);
 };
 
+struct JuaIterator{
+    virtual Jua_Val* next() = 0; //迭代完成时返回 nullptr
+};
 struct JuaError{
     string message;
     JuaError(string msg): message(msg){}

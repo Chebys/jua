@@ -3,6 +3,46 @@
 #include <format>
 #include "jua-vm.h"
 
+struct ListIterator: JuaIterator{
+    jualist& list;
+    size_t index = 0;
+    ListIterator(jualist& l): list(l) {}
+    ListIterator(Jua_Array* arr): list(arr->items) {}
+    Jua_Val* next(){
+        if(index >= list.size())return nullptr;
+        return list[index++];
+    }
+};
+struct CustomIterator: JuaIterator{
+    Jua_Val* obj;
+    Jua_Func* nextFn;
+    Jua_Val* key = Jua_Null::getInst();
+    CustomIterator(Jua_Val* o, Jua_Func* fn): obj(o), nextFn(fn){}
+    CustomIterator(Jua_Val* o): obj(o){
+        nextFn = obj->getMetaMethod("next");
+        if(!nextFn)
+            throw new JuaTypeError("Object is not iterable");
+    }
+    Jua_Val* next(){
+        auto res = nextFn->call({obj, key});
+        if(res->type != Jua_Val::Obj)
+            throw new JuaTypeError("iterator.next() must return an object");
+        auto done = res->getProp("done");
+        if(!done || done->type != Jua_Val::Bool)
+            throw new JuaTypeError("iterator.next() must return an object with a boolean 'done' property");
+        if(done->toBoolean()){
+            return nullptr;
+        }
+        auto value = res->getProp("value");
+        if(!value)
+            throw new JuaTypeError("iterator.next() must return an object with a 'value' property when done is false");
+        key = res->getProp("key");
+        if(!key)
+            throw new JuaTypeError("iterator.next() must return an object with a 'key' property when done is false");
+        return value;
+    }
+};
+
 void Jua_Val::release(){
     ref--;
     gc();
@@ -106,6 +146,20 @@ int64_t Jua_Val::toInt(){
 }
 double Jua_Val::toNumber(){
     throw new JuaTypeError("toNumber() called on a non-number value");
+}
+JuaIterator* Jua_Val::getIterator(){
+    auto nextFn = getMetaMethod("next");
+    if(!nextFn)
+        throw new JuaTypeError("Object is not iterable");
+    return new CustomIterator(this, nextFn);
+}
+void Jua_Val::collectItems(jualist& list){
+    auto it = getIterator();
+    Jua_Val* val;
+    while((val = it->next()) != nullptr){
+        list.push_back(val);
+    }
+    delete it;
 }
 
 void Jua_Val::gc(){
@@ -276,6 +330,9 @@ Jua_Val* Jua_Array::getItem(Jua_Val* key){
 void Jua_Array::setItem(Jua_Val* key, Jua_Val* val){
     size_t i = correctIndex(key, items.size());
     items[i] = val;
+}
+JuaIterator* Jua_Array::getIterator(){
+    return new ListIterator(items);
 }
 
 Jua_Buffer::Jua_Buffer(JuaVM* vm, size_t len):Jua_Obj(vm, vm->BufferProto), length(len){

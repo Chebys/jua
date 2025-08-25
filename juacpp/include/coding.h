@@ -3,10 +3,12 @@
 #include <cstdint>
 
 template<typename T>
-void encode(double num, std::string& str){
+std::string encode(double num){
     T value = num;
+    std::string str;
     str.resize(sizeof(T));
     memcpy(&str[0], &value, sizeof(T));
+    return str;
 }
 
 template<typename T>

@@ -469,14 +469,14 @@ Jua_Obj* JuaVM::makeObjectProto(){
 }
 Jua_NativeFunc* JuaVM::makeEncodeFunc(Encoder encode){
     return makeFunc([this, encode](jualist& args){
-        if(args.size() < 1) throw "encode() requires at least one argument";
-        Jua_Val* val = args[0];
-        if(val->type != Jua_Val::Num){
-            throw new JuaError("encode() requires a number argument");
+        auto str = new Jua_Str(this, "");
+        for(auto v: args) {
+            if(v->type != Jua_Val::Num){
+                throw new JuaError("encode() requires number arguments");
+            }
+            str->value += encode(v->toNumber());
         }
-        string result;
-        encode(val->toNumber(), result);
-        return new Jua_Str(this, result);
+        return str;
     });
 }
 Jua_NativeFunc* JuaVM::makeDecodeFunc(Decoder decode){

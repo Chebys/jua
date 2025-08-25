@@ -58,7 +58,7 @@ struct JuaVM{
     private:
     size_t idcounter = 0;
     Jua_Val* require(const string& name);
-    typedef void Encoder(double, string&);
+    typedef string Encoder(double);
     typedef double Decoder(const string&);
     Jua_NativeFunc* makeEncodeFunc(Encoder);
     Jua_NativeFunc* makeDecodeFunc(Decoder);

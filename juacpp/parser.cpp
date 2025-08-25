@@ -657,8 +657,20 @@ Expr* parsePrimaryTail(Expr* start, TokensReader& reader){
         case Token::PAREN:{
             reader.read();
             auto cl = static_cast<Enclosure*>(next);
-            auto args = parseFlexExprList(cl->reader);
-            auto call = new Call(start, args);
+            Call* call;
+            auto funbody = reader.preview();
+            if(funbody && funbody->type==Token::BRACE){
+                reader.read();
+                auto params = parseDecList(cl->reader);
+                auto cl2 = static_cast<Enclosure*>(funbody);
+                auto stmts = parseStatements(cl2->reader);
+                auto func = new FunExpr(params, stmts);
+                auto args = new FlexibleList({func});
+                call = new Call(start, args);
+            }else{
+                auto args = parseFlexExprList(cl->reader);
+                call = new Call(start, args);
+            }
             return parsePrimaryTail(call, reader);
         }
         case Token::BRACKET:{
@@ -668,6 +680,16 @@ Expr* parsePrimaryTail(Expr* start, TokensReader& reader){
 			cl->reader.assetEnd();
 			auto expr = new Subscription(start, key);
 			return parsePrimaryTail(expr, reader);
+        }
+        case Token::BRACE:{
+            reader.read();
+            auto cl = static_cast<Enclosure*>(next);
+            auto stmts = parseStatements(cl->reader);
+            auto decList = new DeclarationList({});
+            auto func = new FunExpr(decList, stmts);
+            auto args = new FlexibleList({func});
+            auto call = new Call(start, args);
+            return parsePrimaryTail(call, reader);
         }
         default:
             return start;
@@ -970,6 +992,8 @@ Block* parseBlockOrStatement(TokensReader& reader){
 }
 
 FunctionBody* parse(const string& script){
+    //d_log("Parsing script:");
+    //d_log(script);
     ScriptReader reader(script);
     auto stmts = parseStatements(reader);
     return new FunctionBody(stmts);

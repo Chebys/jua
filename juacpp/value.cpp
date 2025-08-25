@@ -71,21 +71,21 @@ Jua_Func* Jua_Val::getMetaMethod(const string& key){
 Jua_Bool* Jua_Val::hasItem(Jua_Val* key){
     auto fn = getMetaMethod("hasItem");
     if(fn)return fn->call({this, key})->toJuaBool();
-    throw "type err";
+    throw new JuaTypeError("Object is not subscriptable");
 }
 Jua_Val* Jua_Val::getItem(Jua_Val* key){
     auto fn = getMetaMethod("getItem");
     if(fn)return fn->call({this, key});
-    throw "type err";
+    throw new JuaTypeError("Object is not subscriptable");
 }
 void Jua_Val::setItem(Jua_Val* key, Jua_Val* val){
     auto fn = getMetaMethod("setItem");
-    if(!fn)throw "type err";
+    if(!fn)throw new JuaTypeError("Object is not subscriptable");
     fn->call({this, key, val});
 }
 Jua_Val* Jua_Val::call(jualist& args){
     auto fn = getMetaMethod("__call");
-    if(!fn)throw "type err";
+    if(!fn)throw new JuaTypeError("Object is not callable");
     args.push_front(this);
     return fn->call(args);
     
@@ -93,27 +93,27 @@ Jua_Val* Jua_Val::call(jualist& args){
 Jua_Val* Jua_Val::unm(){
     Jua_Func* fn = getMetaMethod("__unm");
     if(fn)return fn->call({this});
-    throw "type err";
+    throw new JuaTypeError("Object is not unary negatable");
 }
 Jua_Val* Jua_Val::add(Jua_Val* val){
     Jua_Func* fn = getMetaMethod("__add");
     if(fn)return fn->call({this, val});
-    throw "type err";
+    throw new JuaTypeError("Object is not addable");
 }
 Jua_Val* Jua_Val::sub(Jua_Val* val){
     Jua_Func* fn = getMetaMethod("__sub");
     if(fn)return fn->call({this, val});
-    throw "type err";
+    throw new JuaTypeError("Object is not subtractable");
 }
 Jua_Val* Jua_Val::mul(Jua_Val* val){
     Jua_Func* fn = getMetaMethod("__mul");
     if(fn)return fn->call({this, val});
-    throw "type err";
+    throw new JuaTypeError("Object is not multiplicable");
 }
 Jua_Val* Jua_Val::div(Jua_Val* val){
     Jua_Func* fn = getMetaMethod("__div");
     if(fn)return fn->call({this, val});
-    throw "type err";
+    throw new JuaTypeError("Object is not dividable");
 }
 Jua_Bool* Jua_Val::eq(Jua_Val* val){
     return Jua_Bool::getInst(*this == val);
@@ -121,17 +121,17 @@ Jua_Bool* Jua_Val::eq(Jua_Val* val){
 Jua_Bool* Jua_Val::lt(Jua_Val* val){
     Jua_Func* fn = getMetaMethod("__lt");
     if(fn)return fn->call({this, val})->toJuaBool();
-    throw "type err";
+    throw new JuaTypeError("Object is not comparable");
 }
 Jua_Bool* Jua_Val::le(Jua_Val* val){
     Jua_Func* fn = getMetaMethod("__le");
     if(fn)return fn->call({this, val})->toJuaBool();
-    throw "type err";
+    throw new JuaTypeError("Object is not comparable");
 }
 Jua_Val* Jua_Val::range(Jua_Val* val){
     Jua_Func* fn = getMetaMethod("range");
     if(fn)return fn->call({this, val});
-    throw "type err";
+    throw new JuaTypeError("Object is not rangeable");
 }
 bool Jua_Val::operator==(Jua_Val* val){
     Jua_Func* fn = getMetaMethod("__eq");
@@ -147,10 +147,13 @@ int64_t Jua_Val::toInt(){
 double Jua_Val::toNumber(){
     throw new JuaTypeError("toNumber() called on a non-number value");
 }
-JuaIterator* Jua_Val::getIterator(){
+JuaIterator* Jua_Val::getIterator(Jua_Func* next){
     auto nextFn = getMetaMethod("next");
-    if(!nextFn)
-        throw new JuaTypeError("Object is not iterable");
+    if(!nextFn){
+        if(!next)
+            throw new JuaTypeError("Object is not iterable");
+        nextFn = next;
+    }
     return new CustomIterator(this, nextFn);
 }
 void Jua_Val::collectItems(jualist& list){
@@ -163,9 +166,10 @@ void Jua_Val::collectItems(jualist& list){
 }
 
 void Jua_Val::gc(){
+    //todo
     if(!ref){
         //d_log("gc()");
-        delete this;
+        //delete this;
     }
 }
 
@@ -331,7 +335,7 @@ void Jua_Array::setItem(Jua_Val* key, Jua_Val* val){
     size_t i = correctIndex(key, items.size());
     items[i] = val;
 }
-JuaIterator* Jua_Array::getIterator(){
+JuaIterator* Jua_Array::getIterator(Jua_Func* next){
     return new ListIterator(items);
 }
 
@@ -361,7 +365,7 @@ void Jua_Buffer::write(Jua_Val* _str, Jua_Val* _pos){
     if(!_str || _str->type!=Str)
         throw new JuaTypeError("value must be a string");
     std::string& str = static_cast<Jua_Str*>(_str)->value;
-    size_t pos = correctIndex(_pos, length);
+    size_t pos = _pos ? correctIndex(_pos, length) : 0;
     size_t len = str.size();
     if(pos+len > length)
         throw "out of range";

@@ -88,7 +88,7 @@ struct Jua_Val{
     virtual Jua_Bool* le(Jua_Val*);
     virtual Jua_Val* range(Jua_Val*);
 
-    virtual JuaIterator* getIterator();
+    virtual JuaIterator* getIterator(Jua_Func* next=nullptr); //优先使用元方法 "next"
     virtual void collectItems(jualist&); //仅用于可迭代对象
     virtual bool operator==(Jua_Val* val);
     virtual string toString() = 0; //const string& str = toString()
@@ -230,7 +230,7 @@ struct Jua_Array: Jua_Obj{
     }
     Jua_Val* getItem(Jua_Val*);
     void setItem(Jua_Val*, Jua_Val*);
-    JuaIterator* getIterator() override;
+    JuaIterator* getIterator(Jua_Func* next=nullptr) override;
     void collectItems(jualist& list) override {
         for(auto& item : items){
             list.push_back(item);
@@ -249,7 +249,7 @@ struct Jua_Buffer: Jua_Obj{
     Jua_Val* getItem(Jua_Val*);
     void setItem(Jua_Val*, Jua_Val*);
     Jua_Val* read(Jua_Val* start, Jua_Val* end);
-    void write(Jua_Val* str, Jua_Val* pos);
+    void write(Jua_Val* str, Jua_Val* pos=nullptr);
 };
 
 struct JuaIterator{

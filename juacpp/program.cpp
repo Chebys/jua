@@ -260,23 +260,9 @@ void WhileStmt::exec(Scope* env, Controller* controller){
 }
 void ForStmt::exec(Scope* env, Controller* controller){
     auto target = iterable->calc(env);
-    auto next = target->getMetaMethod("next");
-    if(!next){
-        if(target->type == Jua_Val::Obj)
-            next = target->vm->obj_next;
-        else
-            throw "iterable without next() method must be an object";
-    }
-    Jua_Val *nextResult, *value, *done, *key = Jua_Null::getInst();
-    while(true){
-        nextResult = next->call({target, key});
-        done = nextResult->getProp("done");
-        if(!done)throw "next() must return an value with 'done' property";
-        if(done->toBoolean())break;
-        value = nextResult->getProp("value");
-        if(!value)throw "next() must return an value with 'value' property if not done";
-        key = nextResult->getProp("key");
-        if(!key)throw "next() must return an value with 'key' property if not done";
+    auto it = target->getIterator(env->vm->obj_next);
+    Jua_Val *value;
+    while(value = it->next()){
         declarable->declare(env, value);
         body->exec(new Scope(env), controller);
         controller->continuing = false;
@@ -285,6 +271,7 @@ void ForStmt::exec(Scope* env, Controller* controller){
             break;
         }
     }
+    delete it;
 }
 
 Block::Block(Stmts stmts): statements(stmts){

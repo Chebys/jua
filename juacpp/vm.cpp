@@ -80,11 +80,11 @@ void JuaVM::initBuiltins(){
     NumberProto = makeNumberProto();
     StringProto = makeStringProto();
     BooleanProto = new Jua_Obj(this);
-    FunctionProto = new Jua_Obj(this);
+    FunctionProto = makeFunctionProto();
     ObjectProto = makeObjectProto();
 
     ArrayProto = makeArrayProto();
-    BufferProto = new Jua_Obj(this);
+    BufferProto = makeBufferProto();
 
 }
 void JuaVM::makeGlobal(){
@@ -343,6 +343,25 @@ Jua_Obj* JuaVM::makeStringProto(){
     }));
     return proto;
 }
+Jua_Obj* JuaVM::makeFunctionProto(){
+    auto proto = buildClass([this](jualist& args){
+        if(args.size() < 1) throw new JuaError("Function constructor requires at least one argument");
+        std::deque<DeclarationItem*> params;
+        for(size_t i=0; i<args.size()-1; i++){
+            if(args[i]->type != Jua_Val::Str){
+                throw new JuaError("Function constructor requires string arguments");
+            }
+            auto varname = new Varname(args[i]->toString()); //todo: 检查合法性
+            auto decItem = new DeclarationItem(varname, nullptr);
+            params.push_back(decItem);
+        }
+        auto script = args.back();
+        auto body = parse(script->toString());
+        auto declist = new DeclarationList(params);
+        return new Jua_PFunc(_G, declist, body);
+    });
+    return proto;
+}
 Jua_Obj* JuaVM::makeObjectProto(){
     auto proto = new Jua_Obj(this, classProto);
     proto->setProp("new", obj_new);
@@ -480,6 +499,83 @@ Jua_Obj* JuaVM::makeArrayProto(){
     });
     proto->setProp("of", makeFunc([this](jualist& args){
         return new Jua_Array(this, args);
+    }));
+    proto->setProp("len", makeFunc([](jualist& args){
+        if(args.size() < 1) throw new JuaError("Array.len() requires 1 argument");
+        auto self = args[0];
+        if(!self->isType(Jua_Array::type_id)){
+            throw new JuaError("Array.len() called on a non-array object");
+        }
+        auto arr = static_cast<Jua_Array*>(self);
+        return new Jua_Num(self->vm, arr->items.size());
+    }));
+    proto->setProp("push", makeFunc([](jualist& args){
+        if(args.size() < 2) throw new JuaError("Array.push() requires at least 1 argument");
+        auto self = args[0];
+        if(!self->isType(Jua_Array::type_id)){
+            throw new JuaError("Array.push() called on a non-array object");
+        }
+        auto arr = static_cast<Jua_Array*>(self);
+        for(size_t i=1; i<args.size(); i++){
+            arr->items.push_back(args[i]);
+        }
+        return Jua_Null::getInst();
+    }));
+    proto->setProp("pop", makeFunc([](jualist& args) -> Jua_Val* {
+        if(args.size() < 1) throw new JuaError("Array.pop() requires 1 argument");
+        auto self = args[0];
+        if(!self->isType(Jua_Array::type_id)){
+            throw new JuaError("Array.pop() called on a non-array object");
+        }
+        auto arr = static_cast<Jua_Array*>(self);
+        if(arr->items.empty()){
+            return Jua_Null::getInst();
+        }
+        auto val = arr->items.back();
+        arr->items.pop_back();
+        return val;
+    }));
+    proto->setProp("toString", makeFunc([](jualist& args){
+        if(args.size() < 1) throw new JuaError("Array.toString() requires 1 argument");
+        auto self = args[0];
+        //仅要求可迭代
+        auto iter = self->getIterator();
+        string result = "[";
+        while(auto value = iter->next()){
+            if(result.size() > 1) result += ", ";
+            result += value->toString();
+        }
+        result += "]";
+        return new Jua_Str(self->vm, result);
+    }));
+    return proto;
+}
+Jua_Obj* JuaVM::makeBufferProto(){
+    auto proto = buildClass([this](jualist& args){
+        if(!args.size())
+            throw new JuaError("Missing argument");
+        auto val = args[0];
+        auto buf = new Jua_Buffer(this, val->toInt());
+        return buf;
+    });
+    proto->setProp("read", makeFunc([](jualist& args){
+        if(args.size() < 3) throw new JuaError("Buffer.read() requires 3 argument");
+        auto self = args[0], start = args[1], end = args[2];
+        if(!self->isType(Jua_Buffer::type_id)){
+            throw new JuaError("Buffer.read() called on a improper value");
+        }
+        auto buf = static_cast<Jua_Buffer*>(self);
+        return buf->read(start, end);
+    }));
+    proto->setProp("write", makeFunc([](jualist& args){
+        if(args.size() < 2) throw new JuaError("Buffer.write() requires at least 2 arguments");
+        auto self = args[0], data = args[1], pos = args.size() > 2 ? args[2] : nullptr;
+        if(!self->isType(Jua_Buffer::type_id)){
+            throw new JuaError("Buffer.write() called on a improper value");
+        }
+        auto buf = static_cast<Jua_Buffer*>(self);
+        buf->write(data, pos);
+        return Jua_Null::getInst();
     }));
     return proto;
 }

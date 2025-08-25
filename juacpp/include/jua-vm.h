@@ -30,8 +30,8 @@ struct JuaVM{
     Jua_Val* eval(const string&); //不捕获错误
 
     protected:
-    virtual void initBuiltins();
-    virtual void makeGlobal();
+    void initBuiltins();
+    void makeGlobal();
     virtual string findModule(const string& name) = 0;
     virtual void j_stdout(const jualist&){};
     virtual void j_stderr(JuaError*){};
@@ -42,9 +42,11 @@ struct JuaVM{
     Jua_Obj* makeRangeProto();
     Jua_Obj* makeNumberProto();
     Jua_Obj* makeStringProto();
+    Jua_Obj* makeFunctionProto();
     Jua_Obj* makeObjectProto();
 
     Jua_Obj* makeArrayProto();
+    Jua_Obj* makeBufferProto();
 
     private:
     size_t idcounter = 0;

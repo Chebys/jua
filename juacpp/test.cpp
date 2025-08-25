@@ -17,7 +17,16 @@ void SetConsoleToUTF8() {
 struct JuaRuntime: JuaVM{
     const char* main; //主模块名称
     fs::path cwd;
-    JuaRuntime(const char* name, fs::path _cwd=fs::current_path()): main(name), cwd(_cwd){}
+    JuaRuntime(const char* name, fs::path _cwd=fs::current_path()): main(name), cwd(_cwd){
+        auto api = new Jua_Obj(this);
+        api->setProp("alert", makeFunc([this](jualist& args){
+            if(args.size() < 1) throw new JuaError("api.alert() requires at least 1 argument");
+            auto msg = args[0];
+            cout << "Runtime.alert: " << msg->toString() << '\n';
+            return Jua_Null::getInst();
+        }));
+        _G->setProp("Runtime", api);
+    }
     void run(){
         JuaVM::run(findModule(main));
     }

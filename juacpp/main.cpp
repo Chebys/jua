@@ -2,11 +2,11 @@
 #include <fstream>
 #include <filesystem>
 #include "jua-vm.h"
+#include <windows.h>
 
 namespace fs = std::filesystem;
 using std::cout;
 
-#include <windows.h>
 void SetConsoleToUTF8() {
     SetConsoleOutputCP(CP_UTF8);  // 设置输出编码为UTF-8
     SetConsoleCP(CP_UTF8);        // 设置输入编码为UTF-8
@@ -47,6 +47,21 @@ struct JuaRuntime: JuaVM{
     }
 };
 
+std::string getMultilineInput() {
+    // 以分号结尾表示输入结束
+    std::string result;
+    std::string line;
+    while (true) {
+        std::cout << "> ";
+        std::getline(std::cin, line);
+        result += line;
+        if (!line.empty() && line.back() == ';') break;
+        result += '\n';
+    }
+    
+    return result;
+}
+
 int main(int argc, char* argv[]){
     SetConsoleToUTF8();
     if(argc > 1){
@@ -54,7 +69,19 @@ int main(int argc, char* argv[]){
         JuaRuntime runtime(main_module);
         runtime.run();
     }else{
-        throw "todo: 进入 REPL 模式";
+        cout << "Jua REPL. Add ';' to end input. Type 'exit;' to quit.\n";
+        JuaRuntime rt("<repl>");
+        while (true) {
+            std::string input = getMultilineInput();
+            if (input.empty()) continue;
+            if (input == "exit;") break;
+            try{
+                auto val = rt.eval(input);
+                val->gc();
+            }catch(JuaError* e){
+                rt.j_stderr(e);
+            }
+        }
     }
     return 0;
 }

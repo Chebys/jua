@@ -92,25 +92,29 @@ bool isHex(char c){
     return '0'<=c && c<='9' || 'a'<=c && c<='f' || 'A'<=c && c<='F';
 }
 
-string missing(char c){
-    if(c=='\'')return "Missing \"'\"";
-    string msg = "Missing '";
-    msg.push_back(c);
-    msg.push_back('\'');
-    return msg;
+JuaSyntaxError* missing(char c){
+    string msg;
+    if(c=='\''){
+        msg = "Missing \"'\"";
+    }else{
+        msg = "Missing '";
+        msg.push_back(c);
+        msg.push_back('\'');
+    }
+    return new JuaSyntaxError(msg, -1, -1, -1);
 }
-string unexpected(string str){
+JuaSyntaxError* unexpected(string str){
     string msg = "Unexpected \"";
     msg.append(str);
     msg.push_back('"');
-    return msg;
+    return new JuaSyntaxError(msg, -1, -1, -1);
 }
-string unexpected(string une, string e){
-    string msg = unexpected(une);
-    msg.append("; Expect \"");
-    msg.append(e);
-    msg.push_back('"');
-    return msg;
+JuaSyntaxError* unexpected(string une, string e){
+    auto err = unexpected(une);
+    err->message.append("; Expect \"");
+    err->message.append(e);
+    err->message.push_back('"');
+    return err;
 }
 
 struct Token{
@@ -174,7 +178,7 @@ struct ListReader: TokensReader{
         pos = 0;
     }
     Token* read(){
-        if(pos >= tokens.size())throw "Unfinished input";
+        if(pos >= tokens.size())throw new JuaSyntaxError("Unfinished input", -1, -1, -1);
         return tokens[pos++];
     }
     Token* preview(){
@@ -315,7 +319,7 @@ struct ScriptReader: TokensReader{
         std::vector<Token*> list;
         while(true){
             skipVoid();
-            if(eof())throwError(missing(end));
+            if(eof())throw missing(end);
             if(script[pos]==end){
                 forward(); //假设 end 不是 newline
                 return list;
@@ -351,7 +355,7 @@ struct ScriptReader: TokensReader{
             auto hex = substr(2);
             size_t len;
             uint8_t byte = std::stoi(hex, &len, 16);
-            if(len != 2)throw new JuaError(unexpected(hex));
+            if(len != 2)throw unexpected(hex);
             forwardx(2);
             return byte;
         }else if(c=='u')throw "todo: \\u";
@@ -529,7 +533,7 @@ Declarable* parseDeclarable(TokensReader& reader){
         auto cl = static_cast<Enclosure*>(next);
         return parseLeftObj(cl->reader);
     }
-    throw new JuaError(unexpected(next->str));
+    throw unexpected(next->str, "<declarable>");
 }
 
 Expr* parseCond(TokensReader& reader){
@@ -637,19 +641,19 @@ Expr* parsePrimaryTail(Expr* start, TokensReader& reader){
             if(next->str=="."){ //属性引用
                 reader.read();
                 auto id = reader.read();
-                if(id->type!=Token::WORD)throw "expect property name";
+                if(id->type!=Token::WORD)throw unexpected(id->str, "<property name>");
                 auto expr = new PropRef(start, id->str);
                 return parsePrimaryTail(expr, reader);
             }else if(next->str=="?."){
                 reader.read();
                 auto id = reader.read();
-                if(id->type!=Token::WORD)throw "expect property name";
+                if(id->type!=Token::WORD)throw unexpected(id->str, "<property name>");
                 auto expr = new OptionalPropRef(start, id->str);
                 return parsePrimaryTail(expr, reader);
             }else if(next->str==":"){ //方法包装
                 reader.read();
                 auto name = reader.read();
-                if(name->type!=Token::WORD)throw "expect method name";
+                if(name->type!=Token::WORD)throw unexpected(name->str, "<method name>");
                 auto wrapper = new MethWrapper(start, name->str);
                 return parsePrimaryTail(wrapper, reader);
             }
@@ -714,7 +718,7 @@ Expr* parseExpr(TokensReader& reader){
     }else if(next->str == "="){
         reader.read();
         auto left = dynamic_cast<LeftValue*>(start);
-        if(!left)throw "Cannot assign to non-leftvalue";
+        if(!left)throw unexpected(next->str, "<left value>");
         return new Assignment(left, parseExpr(reader));
     }else if(assigners.contains(next->str)){
         reader.read();
@@ -767,7 +771,7 @@ std::pair<Expr*, Expr*> parseProp(TokensReader& reader){
 		}else if(start->isValidVarname){
 			val = new Varname(start->str);
 		}else{
-			throw "Invalid Varname";
+			throw new JuaSyntaxError("Invalid Varname", -1, -1, -1);
 		}
 	}else if(start->type==Token::BRACKET){
         auto cl = static_cast<Enclosure*>(start);
@@ -775,7 +779,7 @@ std::pair<Expr*, Expr*> parseProp(TokensReader& reader){
 		cl->reader.assetEnd();
 		auto next = reader.preview();
 		if(!next)
-			throw "Unfinished input";
+			throw new JuaSyntaxError("Unfinished input", -1, -1, -1);
 		if(next->str=="="){
 			reader.read();
 			val = parseExpr(reader);
@@ -852,7 +856,7 @@ std::pair<Expr*, DeclarationItem*> parseLeftProp(TokensReader& reader){
 		reader.assertStr("as");
 		decItem = parseDecItem(reader);
 	}else{
-		throw new JuaError(unexpected(next->str));
+		throw unexpected(next->str);
 	}
 	return {key, decItem};
 }
@@ -940,7 +944,7 @@ Statement* parseStatement(TokensReader& reader){
                     if(next->type!=Token::PAREN)throw unexpected(next->str, "(...)");
                     auto cl = static_cast<Enclosure*>(next);
                     auto cond = parseFlexExprList(cl->reader);
-                    if(cond->exprs.empty())throw "Empty case condition";
+                    if(cond->exprs.empty())throw new JuaSyntaxError("Empty case condition", -1, -1, -1);
                     auto block = parseBlockOrStatement(reader);
                     cases.push_back(new CaseBlock(cond, block));
                 }else if(nextStr=="else"){
@@ -952,7 +956,7 @@ Statement* parseStatement(TokensReader& reader){
                 }
             }
             if(cases.empty())
-                throw "Switch statement must have at least one case";
+                throw new JuaSyntaxError("Switch statement must have at least one case", -1, -1, -1);
             return new SwitchStmt(expr, cases, defaultBlock);
         }
         if(start->str=="while"){
@@ -988,7 +992,7 @@ Stmts parseStatements(TokensReader& reader){
 }
 Block* parseBlockOrStatement(TokensReader& reader){
     auto next = reader.preview();
-    if(!next)throw "Unfinished input";
+    if(!next)throw new JuaSyntaxError("Unfinished input", -1, -1, -1);
     if(next->type==Token::BRACE){
         auto cl = static_cast<Enclosure*>(reader.read());
         auto stmts = parseStatements(cl->reader);

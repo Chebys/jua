@@ -75,11 +75,26 @@ void DeclarationItem::declare(Scope* env, Jua_Val* val){
 }
 
 void DeclarationList::assign(Scope *env, Jua_Val *val){
-    //需要迭代器
-    throw "todo: DeclarationList::assign";
+    auto it = val->getIterator();
+    for(auto item: decItems){
+        auto v = it->next();
+        if(v || item->initval)
+            item->assign(env, v);
+        else
+            throw new JuaError("Missing argument");
+    }
+    delete it;
 }
 void DeclarationList::declare(Scope *env, Jua_Val *val){
-    throw "todo: DeclarationList::declare";
+    auto it = val->getIterator();
+    for(auto item: decItems){
+        auto v = it->next();
+        if(v || item->initval)
+            item->declare(env, v);
+        else
+            throw new JuaError("Missing argument");
+    }
+    delete it;
 }
 void DeclarationList::rawDeclare(Scope* env, const jualist& vals){
     for(size_t i=0; i<decItems.size(); i++){
@@ -89,7 +104,7 @@ void DeclarationList::rawDeclare(Scope* env, const jualist& vals){
         else if(item->initval)
             item->declare(env, nullptr);
         else
-            throw "Missing argument";
+            throw new JuaError("Missing argument");
     }
 }
 

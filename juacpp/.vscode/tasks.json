@@ -10,7 +10,7 @@
             "args": [
                 "-std=c++20", "-fmodules-ts", "-g",
                 "-I./include",
-                "debug.cpp", "value.cpp", "parser.cpp", "program.cpp", "vm.cpp", "test.cpp",
+                "debug.cpp", "value.cpp", "parser.cpp", "program.cpp", "vm.cpp", "m-math.cpp", "m-json.cpp", "test.cpp",
                 "-o", "test/test.exe",
             ]
         },
@@ -21,7 +21,7 @@
             "args": [
                 "-std=c++20", "-fmodules-ts", "-g",
                 "-I./include",
-                "debug.cpp", "value.cpp", "parser.cpp", "program.cpp", "vm.cpp", "main.cpp",
+                "debug.cpp", "value.cpp", "parser.cpp", "program.cpp", "vm.cpp", "m-math.cpp", "m-json.cpp", "main.cpp",
                 "-o", "test/main.exe",
             ]
         }

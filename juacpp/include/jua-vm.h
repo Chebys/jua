@@ -52,6 +52,9 @@ struct JuaVM{
     Jua_Obj* makeErrorProto();
     Jua_Obj* makeTryResProto();
 
+    Jua_Obj* makeMath();
+    Jua_Obj* makeJSON();
+
     private:
     size_t idcounter = 0;
     Jua_Val* require(const string& name);

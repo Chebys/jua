@@ -5,6 +5,10 @@
 JuaVM::JuaVM(){
     initBuiltins();
     makeGlobal();
+    modules["math"] = makeMath();
+    modules["math"]->addRef();
+    modules["json"] = makeJSON();
+    modules["json"]->addRef();
 }
 
 void JuaVM::run(const string& script){

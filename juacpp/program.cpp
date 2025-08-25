@@ -160,8 +160,15 @@ Jua_Val* UnitaryExpr::calc(Scope* env){
     return operate(oper, val);
 }
 Jua_Val* BinaryExpr::calc(Scope* env){
-    auto lv = left->calc(env), rv = right->calc(env);
-    return operate(oper, lv, rv);
+    auto leftVal = left->calc(env);
+    switch(oper){
+        case BinOper::and_:
+            return leftVal->toBoolean() ? right->calc(env) : leftVal;
+        case BinOper::or_:
+            return leftVal->toBoolean() ? leftVal : right->calc(env);
+        default:
+            return operate(oper, leftVal, right->calc(env));
+    }
 }
 Jua_Val* Assignment::calc(Scope* env){
     auto val = right->calc(env);

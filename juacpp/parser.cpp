@@ -691,6 +691,15 @@ Expr* parsePrimaryTail(Expr* start, TokensReader& reader){
             auto call = new Call(start, args);
             return parsePrimaryTail(call, reader);
         }
+        case Token::STR:{
+            reader.read();
+            auto str = new LiteralStr(next->str);
+            auto call = new Call(start, new FlexibleList({str}));
+            return parsePrimaryTail(call, reader);
+        }
+        case Token::DQ_STR:{
+            throw "todo: print \"$expr\"";
+        }
         default:
             return start;
     }

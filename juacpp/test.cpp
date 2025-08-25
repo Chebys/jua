@@ -19,6 +19,7 @@ struct JuaRuntime: JuaVM{
     fs::path cwd;
     JuaRuntime(const char* name, fs::path _cwd=fs::current_path()): main(name), cwd(_cwd){
         auto api = new Jua_Obj(this);
+        api->setProp("version", new Jua_Str(this, "JuaRuntime 0.1"));
         api->setProp("alert", makeFunc([this](jualist& args){
             if(args.size() < 1) throw new JuaError("api.alert() requires at least 1 argument");
             auto msg = args[0];

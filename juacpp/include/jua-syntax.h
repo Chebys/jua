@@ -90,7 +90,7 @@ struct BinaryExpr: Expr{
     BinOper oper;
     Expr* left;
     Expr* right;
-    BinaryExpr(BinOper type, Expr* l, Expr* r): oper(type), left(l), right(r){}
+    BinaryExpr(BinOper type, Expr* l, Expr* r): oper(type), left(l), right(r) {}
 	Jua_Val* calc(Scope* env);
 };
 struct Assignment: Expr{

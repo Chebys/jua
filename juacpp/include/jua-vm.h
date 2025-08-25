@@ -13,6 +13,8 @@ struct JuaVM{
     Jua_Obj* ArrayProto;
     Jua_Obj* BufferProto;
     Jua_Obj* RangeProto;
+    Jua_Obj* ErrorProto;
+    Jua_Obj* TryResProto;
 
     Jua_NativeFunc* obj_new;
     Jua_NativeFunc* obj_hasOwn;
@@ -31,7 +33,7 @@ struct JuaVM{
 
     protected:
     void initBuiltins();
-    void makeGlobal();
+    void makeGlobal(); //在构造函数中调用，重写没有意义；要添加内置值请在子类构造函数中进行
     virtual string findModule(const string& name) = 0;
     virtual void j_stdout(const jualist&){};
     virtual void j_stderr(JuaError*){};
@@ -47,6 +49,8 @@ struct JuaVM{
 
     Jua_Obj* makeArrayProto();
     Jua_Obj* makeBufferProto();
+    Jua_Obj* makeErrorProto();
+    Jua_Obj* makeTryResProto();
 
     private:
     size_t idcounter = 0;

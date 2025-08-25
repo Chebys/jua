@@ -196,14 +196,14 @@ Jua_Bool* Jua_Obj::hasItem(Jua_Val* key){
     auto fn = getMetaMethod("hasItem");
     if(fn)return fn->call({this, key})->toJuaBool();
     if(key->type!=Str)
-        throw new JuaTypeError("key must be a string");
+        throw new JuaTypeError("Object.hasItem: key must be a string");
     return Jua_Bool::getInst(getProp(key->toString()));
 }
 Jua_Val* Jua_Obj::getItem(Jua_Val* key){
     auto fn = getMetaMethod("getItem");
     if(fn)return fn->call({this, key});
     if(key->type!=Str)
-        throw new JuaTypeError("key must be a string");
+        throw new JuaTypeError("Object.getItem: key must be a string");
     Jua_Val* val = getProp(key->toString());
     return val ? val : Jua_Null::getInst();
 }
@@ -214,7 +214,7 @@ void Jua_Obj::setItem(Jua_Val* key, Jua_Val* val){
         return;
     }
     if(key->type!=Str)
-        throw new JuaTypeError("key must be a string");
+        throw new JuaTypeError("Object.setItem: key must be a string");
     setProp(key->toString(), val);
 }
 void Jua_Obj::assignProps(Jua_Obj* obj){

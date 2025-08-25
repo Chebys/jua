@@ -74,8 +74,8 @@ inline Jua_Val* operate(UniOper type, Jua_Val* val){
         default: throw "todo: UniOper";
     }
 }
-//todo: 短路
 inline Jua_Val* operate(BinOper type, Jua_Val* left, Jua_Val* right){
+    //短路不在此处理
     switch(type){
         case BinOper::add: return left->add(right);
         case BinOper::sub: return left->sub(right);
@@ -88,8 +88,6 @@ inline Jua_Val* operate(BinOper type, Jua_Val* left, Jua_Val* right){
         case BinOper::ge: return Jua_Bool::getInst(!left->lt(right)->toBoolean());
         case BinOper::eq: return left->eq(right);
         case BinOper::ne: return Jua_Bool::getInst(!(*left == right));
-        case BinOper::and_: return left->toBoolean() ? right : left;
-        case BinOper::or_: return left->toBoolean() ? left : right;
     }
     d_log(int(type));
     throw "todo: BinOper";

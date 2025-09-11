@@ -73,13 +73,15 @@ return Number.range(self, end, 1)
 ## String
 String 是所有字符串的原型。
 ### String.byte(self, i)
+### String.escape(str)
 ### String.fromByte(*bytes)
 ### String.hasItem(self, i)
 ### String.getItem(self, i)
 ### String.len(str)
-### String.lower
-### String.upper
-### String.slice
+### String.lower(str)
+### String.unescape(str)
+### String.upper(str)
+### String.slice(self, i, j)
 ### String.toHex
 
 ## Boolean
@@ -95,6 +97,7 @@ String 是所有字符串的原型。
 ### Array.resize(self, len)
 ### Array.setItem(self, i)
 ### Array.shift(self)
+### Array.splice
 ### Array.toString(self)
 ### Array.unshift(self, item)
 

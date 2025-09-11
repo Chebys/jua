@@ -216,7 +216,11 @@ class Jua_Obj extends Jua_Val{
 			if(res instanceof Jua_Str)
 				return res.value;
 		}
-		return `{${Object.keys(this.dict).join(', ')}}`;
+		let props = Object.entries(this.dict).map(([k,v])=>{
+			let vtext = v instanceof Jua_Obj ? '<object>' : v.toString()
+			return k+'='+vtext
+		})
+		return `{${props.join(', ')}}`;
 	}
 	toJSON(){
 		//todo: 覆盖

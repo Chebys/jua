@@ -351,9 +351,8 @@ void Jua_Buffer::setItem(Jua_Val* key, Jua_Val* val){
     bytes[i] = val->toInt();
 }
 Jua_Val* Jua_Buffer::read(Jua_Val* _start, Jua_Val* _end){
-    size_t start = correctIndex(_start, length);
-    size_t end = correctIndex(_end, length);
-    if(!end)end = length;
+    size_t start = _start ? correctIndex(_start, length) : 0;
+    size_t end = _end ? correctIndex(_end, length) : length;
     if(start>=end)throw "range error";
     size_t len = end-start;
     auto str = new Jua_Str(vm);

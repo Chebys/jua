@@ -1,6 +1,8 @@
 # Jua
 Jua 是一门脚本语言。其名称的寓意是“长得像 JS 的 Lua 语言”。设计时主要参考了JS 的简洁语法和 Lua 的精简内核。
 
+语言定位：通用，学起来快，写起来也快。<!--运行起来就不快了-->
+
 ## 了解 Jua
 * [在线体验](https://chebys.pages.dev/html/jua) Jua 的语法
 * 查阅[Jua 草案](draft/jua草案.md)以了解 Jua 的准确规定

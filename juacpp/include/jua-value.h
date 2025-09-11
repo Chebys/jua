@@ -248,7 +248,7 @@ struct Jua_Buffer: Jua_Obj{
     }
     Jua_Val* getItem(Jua_Val*);
     void setItem(Jua_Val*, Jua_Val*);
-    Jua_Val* read(Jua_Val* start, Jua_Val* end);
+    Jua_Val* read(Jua_Val* start=nullptr, Jua_Val* end=nullptr);
     void write(Jua_Val* str, Jua_Val* pos=nullptr);
 };
 

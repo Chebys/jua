@@ -5,10 +5,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "debug",
+            "name": "test",
             "type": "cppdbg",
             "request": "launch",
-            "preLaunchTask": "debug-build",
+            "preLaunchTask": "test-build",
             "program": "${workspaceFolder}/test/test.exe",
             "args": [],
             "stopAtEntry": false,

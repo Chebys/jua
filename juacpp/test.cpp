@@ -14,25 +14,25 @@ void SetConsoleToUTF8() {
     SetConsoleCP(CP_UTF8);        // 设置输入编码为UTF-8
 }
 
-struct JuaRuntime: JuaVM{
+struct JuaRuntime: VM{
     const char* main; //主模块名称
     fs::path cwd;
     JuaRuntime(const char* name, fs::path _cwd=fs::current_path()): main(name), cwd(_cwd){
-        auto api = new Jua_Obj(this);
-        api->setProp("version", new Jua_Str(this, "JuaRuntime 0.1"));
+        auto api = new Object(this);
+        api->setProp("version", new String(this, "JuaRuntime 0.1"));
         api->setProp("alert", makeFunc([this](jualist& args){
             if(args.size() < 1) throw new JuaError("api.alert() requires at least 1 argument");
             auto msg = args[0];
             cout << "Runtime.alert: " << msg->toString() << '\n';
-            return Jua_Null::getInst();
+            return Null::getInst();
         }));
         _G->setProp("Runtime", api);
-        auto fs_api = new Jua_Obj(this);
-        fs_api->setProp("cwd", new Jua_Str(this, cwd.string()));
+        auto fs_api = new Object(this);
+        fs_api->setProp("cwd", new String(this, cwd.string()));
         fs_api->setProp("openAsBuffer", makeFunc([this](jualist& args){
             if(args.size() < 1) throw new JuaError("fs.openAsBuffer() requires at least 1 argument");
             auto pathVal = args[0];
-            if(pathVal->type != Jua_Val::Str)
+            if(pathVal->type != Value::Str)
                 throw new JuaError("fs.openAsBuffer() requires a string argument");
             fs::path fp = cwd/pathVal->toString();
             std::fstream file(fp, std::ios_base::in | std::ios_base::binary);
@@ -41,14 +41,14 @@ struct JuaRuntime: JuaVM{
                 throw new JuaError(err+fp.string());
             }
             size_t len = fs::file_size(fp);
-            auto buf = new Jua_Buffer(this, len);
+            auto buf = new Buffer(this, len);
             file.read((char*)buf->bytes, len);
             return buf;
         }));
         fs_api->setProp("write", makeFunc([this](jualist& args){
             if(args.size() < 2) throw new JuaError("fs.write() requires at least 2 arguments");
             auto pathVal = args[0];
-            if(pathVal->type != Jua_Val::Str)
+            if(pathVal->type != Value::Str)
                 throw new JuaError("fs.write() requires a string as the first argument");
             auto data = args[1];
             fs::path fp = cwd/pathVal->toString();
@@ -57,21 +57,21 @@ struct JuaRuntime: JuaVM{
                 std::string err = "Cannot open file for writing: ";
                 throw new JuaError(err+fp.string());
             }
-            if(data->type == Jua_Val::Str){
-                auto str = static_cast<Jua_Str*>(data);
+            if(data->type == Value::Str){
+                auto str = static_cast<String*>(data);
                 file.write(str->value.data(), str->value.size());
-            } else if(data->isType(Jua_Buffer::type_id)){
-                auto buf = static_cast<Jua_Buffer*>(data);
+            } else if(data->isType(Buffer::type_id)){
+                auto buf = static_cast<Buffer*>(data);
                 file.write((char*)buf->bytes, buf->length);
             } else {
                 throw new JuaError("fs.write() requires a string or buffer as the second argument");
             }
-            return Jua_Null::getInst();
+            return Null::getInst();
         }));
         modules["fs"] = fs_api;
     }
     void run(){
-        JuaVM::run(findModule(main));
+        VM::run(findModule(main));
     }
     std::string findModule(const std::string& name){
         fs::path fp = cwd/(name+".jua");
@@ -113,11 +113,11 @@ int main(int argc, char* argv[]){
         SetConsoleToUTF8();
         cout << "构造 JuaRuntime\n";
         JuaRuntime RT(main_module);
-        cout << "JuaVM::run\n";
+        cout << "VM::run\n";
         RT.run();
-        cout << "JuaVM::run 完毕\n";
+        cout << "VM::run 完毕\n";
     }catch(JuaError* err){
-        cout << "在 JuaVM::run 外部捕获 JuaError: " << err->toDebugString() << '\n';
+        cout << "在 VM::run 外部捕获 JuaError: " << err->toDebugString() << '\n';
     }catch(const char* str){
         cout<<str<<'\n';
     }catch(string str){

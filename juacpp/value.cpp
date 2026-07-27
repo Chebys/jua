@@ -2,33 +2,34 @@
 #include <charconv>
 #include <format>
 #include "jua-vm.h"
+using namespace Jua;
 
 struct ListIterator: JuaIterator{
     jualist& list;
     size_t index = 0;
     ListIterator(jualist& l): list(l) {}
-    ListIterator(Jua_Array* arr): list(arr->items) {}
-    Jua_Val* next(){
+    ListIterator(Array* arr): list(arr->items) {}
+    Value* next(){
         if(index >= list.size())return nullptr;
         return list[index++];
     }
 };
 struct CustomIterator: JuaIterator{
-    Jua_Val* obj;
-    Jua_Func* nextFn;
-    Jua_Val* key = Jua_Null::getInst();
-    CustomIterator(Jua_Val* o, Jua_Func* fn): obj(o), nextFn(fn){}
-    CustomIterator(Jua_Val* o): obj(o){
+    Value* obj;
+    Function* nextFn;
+    Value* key = Null::getInst();
+    CustomIterator(Value* o, Function* fn): obj(o), nextFn(fn){}
+    CustomIterator(Value* o): obj(o){
         nextFn = obj->getMetaMethod("next");
         if(!nextFn)
             throw new JuaTypeError("Object is not iterable");
     }
-    Jua_Val* next(){
+    Value* next(){
         auto res = nextFn->call({obj, key});
-        if(res->type != Jua_Val::Obj)
+        if(res->type != Value::Obj)
             throw new JuaTypeError("iterator.next() must return an object");
         auto done = res->getProp("done");
-        if(!done || done->type != Jua_Val::Bool)
+        if(!done || done->type != Value::Bool)
             throw new JuaTypeError("iterator.next() must return an object with a boolean 'done' property");
         if(done->toBoolean()){
             return nullptr;
@@ -43,111 +44,107 @@ struct CustomIterator: JuaIterator{
     }
 };
 
-void Jua_Val::release(){
-    ref--;
-    gc();
-}
-Jua_Val* Jua_Val::inheritProp(const string& key){
+Value* Value::inheritProp(const string& key){
     if(!proto)return nullptr;
     if(proto->isPropTrue("__class")){
-        Jua_Val* super = getOwn("super");
+        Value* super = getOwn("super");
         if(!super)return nullptr;
         return super->getProp(key);
     }
     return proto->getProp(key);
 }
-Jua_Val* Jua_Val::getProp(const string& key){
+Value* Value::getProp(const string& key){
     auto own = getOwn(key);
     if(own)return own;
     return inheritProp(key);
 }
-Jua_Func* Jua_Val::getMetaMethod(const string& key){
+Function* Value::getMetaMethod(const string& key){
     if(!proto)return nullptr;
     auto meth = proto->getProp(key);
     if(meth && meth->type==Func)
-        return (Jua_Func*)meth;
+        return (Function*)meth;
     return nullptr;
 }
-Jua_Bool* Jua_Val::hasItem(Jua_Val* key){
+Boolean* Value::hasItem(Value* key){
     auto fn = getMetaMethod("hasItem");
     if(fn)return fn->call({this, key})->toJuaBool();
     throw new JuaTypeError("Object is not subscriptable");
 }
-Jua_Val* Jua_Val::getItem(Jua_Val* key){
+Value* Value::getItem(Value* key){
     auto fn = getMetaMethod("getItem");
     if(fn)return fn->call({this, key});
     throw new JuaTypeError("Object is not subscriptable");
 }
-void Jua_Val::setItem(Jua_Val* key, Jua_Val* val){
+void Value::setItem(Value* key, Value* val){
     auto fn = getMetaMethod("setItem");
     if(!fn)throw new JuaTypeError("Object is not subscriptable");
     fn->call({this, key, val});
 }
-Jua_Val* Jua_Val::call(jualist& args){
+Value* Value::call(jualist& args){
     auto fn = getMetaMethod("__call");
     if(!fn)throw new JuaTypeError("Object is not callable");
     args.push_front(this);
     return fn->call(args);
     
 }
-Jua_Val* Jua_Val::unm(){
-    Jua_Func* fn = getMetaMethod("__unm");
+Value* Value::unm(){
+    Function* fn = getMetaMethod("__unm");
     if(fn)return fn->call({this});
     throw new JuaTypeError("Object is not unary negatable");
 }
-Jua_Val* Jua_Val::add(Jua_Val* val){
-    Jua_Func* fn = getMetaMethod("__add");
+Value* Value::add(Value* val){
+    Function* fn = getMetaMethod("__add");
     if(fn)return fn->call({this, val});
     throw new JuaTypeError("Object is not addable");
 }
-Jua_Val* Jua_Val::sub(Jua_Val* val){
-    Jua_Func* fn = getMetaMethod("__sub");
+Value* Value::sub(Value* val){
+    Function* fn = getMetaMethod("__sub");
     if(fn)return fn->call({this, val});
     throw new JuaTypeError("Object is not subtractable");
 }
-Jua_Val* Jua_Val::mul(Jua_Val* val){
-    Jua_Func* fn = getMetaMethod("__mul");
+Value* Value::mul(Value* val){
+    Function* fn = getMetaMethod("__mul");
     if(fn)return fn->call({this, val});
     throw new JuaTypeError("Object is not multiplicable");
 }
-Jua_Val* Jua_Val::div(Jua_Val* val){
-    Jua_Func* fn = getMetaMethod("__div");
+Value* Value::div(Value* val){
+    Function* fn = getMetaMethod("__div");
     if(fn)return fn->call({this, val});
     throw new JuaTypeError("Object is not dividable");
 }
-Jua_Bool* Jua_Val::eq(Jua_Val* val){
-    return Jua_Bool::getInst(*this == val);
+Boolean* Value::eq(Value* val){
+    return Boolean::getInst(*this == val);
 }
-Jua_Bool* Jua_Val::lt(Jua_Val* val){
-    Jua_Func* fn = getMetaMethod("__lt");
+Boolean* Value::lt(Value* val){
+    Function* fn = getMetaMethod("__lt");
     if(fn)return fn->call({this, val})->toJuaBool();
     throw new JuaTypeError("Object is not comparable");
 }
-Jua_Bool* Jua_Val::le(Jua_Val* val){
-    Jua_Func* fn = getMetaMethod("__le");
+Boolean* Value::le(Value* val){
+    Function* fn = getMetaMethod("__le");
     if(fn)return fn->call({this, val})->toJuaBool();
     throw new JuaTypeError("Object is not comparable");
 }
-Jua_Val* Jua_Val::range(Jua_Val* val){
-    Jua_Func* fn = getMetaMethod("range");
+Value* Value::range(Value* val){
+    Function* fn = getMetaMethod("range");
     if(fn)return fn->call({this, val});
     throw new JuaTypeError("Object is not rangeable");
 }
-bool Jua_Val::operator==(Jua_Val* val){
-    Jua_Func* fn = getMetaMethod("__eq");
+bool Value::operator==(Value* val){
+    Function* fn = getMetaMethod("__eq");
     if(fn)return fn->call({this, val})->toBoolean();
     return this == val;
 }
-Jua_Bool* Jua_Val::toJuaBool(){
-    return Jua_Bool::getInst(toBoolean());
+Boolean* Value::toJuaBool(){
+    return Boolean::getInst(toBoolean());
 }
-int64_t Jua_Val::toInt(){
+int64_t Value::toInt(){
     throw new JuaTypeError("toInt() called on a non-number value");
 }
-double Jua_Val::toNumber(){
+double Value::toNumber(){
     throw new JuaTypeError("toNumber() called on a non-number value");
 }
-JuaIterator* Jua_Val::getIterator(Jua_Func* next){
+JuaIterator* Value::getIterator(Function* next){
     auto nextFn = getMetaMethod("next");
     if(!nextFn){
         if(!next)
@@ -156,16 +153,16 @@ JuaIterator* Jua_Val::getIterator(Jua_Func* next){
     }
     return new CustomIterator(this, nextFn);
 }
-void Jua_Val::collectItems(jualist& list){
+void Value::collectItems(jualist& list){
     auto it = getIterator();
-    Jua_Val* val;
+    Value* val;
     while((val = it->next()) != nullptr){
         list.push_back(val);
     }
     delete it;
 }
 
-void Jua_Val::gc(){
+void Value::gc(){
     //todo
     if(!ref){
         //d_log("gc()");
@@ -173,41 +170,41 @@ void Jua_Val::gc(){
     }
 }
 
-Jua_Obj::Jua_Obj(JuaVM* vm_, Jua_Obj* p): Jua_Val(vm_, Obj, p){ if(p)p->addRef(); }
-Jua_Obj::~Jua_Obj(){ if(proto)proto->release(); }
-bool Jua_Obj::hasOwn(Jua_Val* key){
+Object::Object(VM* vm_, Object* p): Value(vm_, Obj, p){ if(p)p->addRef(); }
+Object::~Object(){ if(proto)proto->release(); }
+bool Object::hasOwn(Value* key){
     if(key->type != Str)throw new JuaError("non-string key");
     return dict.contains(key->toString());
 }
-void Jua_Obj::setProp(const string& key, Jua_Val* val){
+void Object::setProp(const string& key, Value* val){
     if(dict.contains(key)){
         dict[key]->release();
     }
     dict[key] = val;
     val->addRef();
 }
-void Jua_Obj::delProp(const string& key){
+void Object::delProp(const string& key){
     if(dict.contains(key)){
         dict[key]->release();
         dict.erase(key);
     }
 }
-Jua_Bool* Jua_Obj::hasItem(Jua_Val* key){
+Boolean* Object::hasItem(Value* key){
     auto fn = getMetaMethod("hasItem");
     if(fn)return fn->call({this, key})->toJuaBool();
     if(key->type!=Str)
         throw new JuaTypeError("Object.hasItem: key must be a string");
-    return Jua_Bool::getInst(getProp(key->toString()));
+    return Boolean::getInst(getProp(key->toString()));
 }
-Jua_Val* Jua_Obj::getItem(Jua_Val* key){
+Value* Object::getItem(Value* key){
     auto fn = getMetaMethod("getItem");
     if(fn)return fn->call({this, key});
     if(key->type!=Str)
         throw new JuaTypeError("Object.getItem: key must be a string");
-    Jua_Val* val = getProp(key->toString());
-    return val ? val : Jua_Null::getInst();
+    Value* val = getProp(key->toString());
+    return val ? val : Null::getInst();
 }
-void Jua_Obj::setItem(Jua_Val* key, Jua_Val* val){
+void Object::setItem(Value* key, Value* val){
     auto fn = getMetaMethod("setItem");
     if(fn){
         fn->call({this, key, val});
@@ -217,17 +214,17 @@ void Jua_Obj::setItem(Jua_Val* key, Jua_Val* val){
         throw new JuaTypeError("Object.setItem: key must be a string");
     setProp(key->toString(), val);
 }
-void Jua_Obj::assignProps(Jua_Obj* obj){
+void Object::assignProps(Object* obj){
     for(auto& pair : obj->dict){
         dict[pair.first] = pair.second;
     }
 }
-string Jua_Obj::toString(){
+string Object::toString(){
     auto fn = getMetaMethod("toString");
     if(fn)return fn->call({this})->toString();
     return safeToString();
 }
-string Jua_Obj::safeToString(){
+string Object::safeToString(){
     if(dict.empty())return "{}";
     string str("{");
     auto it = dict.begin();
@@ -239,131 +236,133 @@ string Jua_Obj::safeToString(){
     str.append("}");
     return str;
 }
-bool Jua_Obj::isPropTrue(const char* key){
-    return getProp(key) == Jua_Bool::getInst(true);
+bool Object::isPropTrue(const char* key){
+    return getProp(key) == Boolean::getInst(true);
 }
 
-Jua_Num::Jua_Num(JuaVM* vm, double v): Jua_Val(vm, Num, vm->NumberProto), value(v){}
-Jua_Val* Jua_Num::unm(){
-    return new Jua_Num(vm, -value);
+Number::Number(VM* vm, double v): Value(vm, Num, vm->NumberProto), value(v){}
+Value* Number::unm(){
+    return new Number(vm, -value);
 }
-Jua_Val* Jua_Num::add(Jua_Val* val){
+Value* Number::add(Value* val){
     if(val->type!=Num)throw new JuaTypeError("try to add non-number");
-    auto num = static_cast<Jua_Num*>(val);
-    return new Jua_Num(vm, value + num->value);
+    auto num = static_cast<Number*>(val);
+    return new Number(vm, value + num->value);
 }
-Jua_Val* Jua_Num::sub(Jua_Val* val){
+Value* Number::sub(Value* val){
     if(val->type!=Num)throw new JuaTypeError("try to sub non-number");
-    auto num = static_cast<Jua_Num*>(val);
-    return new Jua_Num(vm, value - num->value);
+    auto num = static_cast<Number*>(val);
+    return new Number(vm, value - num->value);
 }
-Jua_Val* Jua_Num::mul(Jua_Val* val){
+Value* Number::mul(Value* val){
     if(val->type!=Num)throw new JuaTypeError("try to mul non-number");
-    auto num = static_cast<Jua_Num*>(val);
-    return new Jua_Num(vm, value * num->value);
+    auto num = static_cast<Number*>(val);
+    return new Number(vm, value * num->value);
 }
-Jua_Val* Jua_Num::div(Jua_Val* val){
+Value* Number::div(Value* val){
     if(val->type!=Num)throw new JuaTypeError("try to div non-number");
-    auto num = static_cast<Jua_Num*>(val);
-    return new Jua_Num(vm, value / num->value);
+    auto num = static_cast<Number*>(val);
+    return new Number(vm, value / num->value);
 }
-Jua_Bool* Jua_Num::lt(Jua_Val* val){
+Boolean* Number::lt(Value* val){
     if(val->type!=Num)throw new JuaTypeError("try to compare non-number");
-    auto num = static_cast<Jua_Num*>(val);
-    return Jua_Bool::getInst(value < num->value);
+    auto num = static_cast<Number*>(val);
+    return Boolean::getInst(value < num->value);
 }
-Jua_Bool* Jua_Num::le(Jua_Val* val){
+Boolean* Number::le(Value* val){
     if(val->type!=Num)throw new JuaTypeError("try to compare non-number");
-    auto num = static_cast<Jua_Num*>(val);
-    return Jua_Bool::getInst(value <= num->value);
+    auto num = static_cast<Number*>(val);
+    return Boolean::getInst(value <= num->value);
 }
-Jua_Val* Jua_Num::range(Jua_Val* val){
+Value* Number::range(Value* val){
     if(val->type!=Num)throw new JuaTypeError("try to create range with non-number");
-    auto num = static_cast<Jua_Num*>(val);
-    auto range = new Jua_Obj(vm, vm->RangeProto);
-    range->setProp("start", new Jua_Num(vm, value));
-    range->setProp("step", new Jua_Num(vm, 1));
-    range->setProp("end", new Jua_Num(vm, num->value));
+    auto num = static_cast<Number*>(val);
+    auto range = new Object(vm, vm->RangeProto);
+    range->setProp("start", new Number(vm, value));
+    range->setProp("step", new Number(vm, 1));
+    range->setProp("end", new Number(vm, num->value));
     return range;
 }
-bool Jua_Num::operator==(Jua_Val* val){
+bool Number::operator==(Value* val){
     if(!val || val->type!=Num)
         return false;
-    return value == static_cast<Jua_Num*>(val)->value;
+    return value == static_cast<Number*>(val)->value;
 }
-string Jua_Num::toString(){
+string Number::toString(){
     char s[32];
     auto res = std::to_chars(s, s+32, value);
     return {s, res.ptr};
 }
 
-size_t correctIndex(Jua_Val* num, size_t len){
+size_t correctIndex(Value* num, size_t len){
     return num->toInt() % len;
 }
 
-Jua_Str::Jua_Str(JuaVM* vm, const string& v): Jua_Val(vm, Str, vm->StringProto), value(v){}
-Jua_Bool* Jua_Str::hasItem(Jua_Val* val){
-    if(val->type!=Str)return Jua_Bool::getInst(false);
-    return Jua_Bool::getInst(value.find(val->toString()) != string::npos);
+String::String(VM* vm, const string& v): Value(vm, Str, vm->StringProto), value(v){}
+Boolean* String::hasItem(Value* val){
+    if(val->type!=Str)return Boolean::getInst(false);
+    return Boolean::getInst(value.find(val->toString()) != string::npos);
 }
-Jua_Val* Jua_Str::getItem(Jua_Val* key){
+Value* String::getItem(Value* key){
     size_t i = correctIndex(key, value.length());
-    return new Jua_Str(vm, {value[i]});
+    return new String(vm, {value[i]});
 }
-Jua_Val* Jua_Str::add(Jua_Val* val){
+Value* String::add(Value* val){
     if(val->type!=Str)throw new JuaTypeError("try to add non-string");
-    auto str = static_cast<Jua_Str*>(val);
-    return new Jua_Str(vm, value + str->value);
+    auto str = static_cast<String*>(val);
+    return new String(vm, value + str->value);
 }
-bool Jua_Str::operator==(Jua_Val* val){
+bool String::operator==(Value* val){
     if(!val || val->type!=Str)
         return false;
-    return value == static_cast<Jua_Str*>(val)->value;
+    return value == static_cast<String*>(val)->value;
 }
 
-Jua_Val* Scope::inheritProp(const string& key){
+Value* Scope::inheritProp(const string& key){
     if(parent)return parent->getProp(key); //指针可能已经失效？？？
     return nullptr;
 }
 
-Jua_Array::Jua_Array(JuaVM* vm, const jualist& list): Jua_Obj(vm, vm->ArrayProto), items(list){}
-Jua_Val* Jua_Array::getItem(Jua_Val* key){
+Array::Array(VM* vm, const jualist& list): Object(vm, vm->ArrayProto), items(list){}
+Value* Array::getItem(Value* key){
     size_t i = correctIndex(key, items.size());
     return items[i];
 }
-void Jua_Array::setItem(Jua_Val* key, Jua_Val* val){
+void Array::setItem(Value* key, Value* val){
     size_t i = correctIndex(key, items.size());
     items[i] = val;
 }
-JuaIterator* Jua_Array::getIterator(Jua_Func* next){
+JuaIterator* Array::getIterator(Function* next){
     return new ListIterator(items);
 }
 
-Jua_Buffer::Jua_Buffer(JuaVM* vm, size_t len):Jua_Obj(vm, vm->BufferProto), length(len){
+Buffer::Buffer(VM* vm, size_t len):Object(vm, vm->BufferProto), length(len){
     bytes = new uint8_t[len];
 }
-Jua_Val* Jua_Buffer::getItem(Jua_Val* key){
+Buffer::Buffer(VM* vm, uint8_t* data, size_t len, bool shared):
+    Object(vm, vm->BufferProto), bytes(data), length(len), shared(shared){}
+Value* Buffer::getItem(Value* key){
     size_t i = correctIndex(key, length);
-    return new Jua_Num(vm, bytes[i]);
+    return new Number(vm, bytes[i]);
 }
-void Jua_Buffer::setItem(Jua_Val* key, Jua_Val* val){
+void Buffer::setItem(Value* key, Value* val){
     size_t i = correctIndex(key, length);
     bytes[i] = val->toInt();
 }
-Jua_Val* Jua_Buffer::read(Jua_Val* _start, Jua_Val* _end){
+Value* Buffer::read(Value* _start, Value* _end){
     size_t start = _start ? correctIndex(_start, length) : 0;
     size_t end = _end ? correctIndex(_end, length) : length;
     if(start>=end)throw "range error";
     size_t len = end-start;
-    auto str = new Jua_Str(vm);
+    auto str = new String(vm);
     str->value.resize(len);
     memcpy(&str->value[0], bytes+start, len);
     return str;
 }
-void Jua_Buffer::write(Jua_Val* _str, Jua_Val* _pos){
+void Buffer::write(Value* _str, Value* _pos){
     if(!_str || _str->type!=Str)
         throw new JuaTypeError("value must be a string");
-    std::string& str = static_cast<Jua_Str*>(_str)->value;
+    std::string& str = static_cast<String*>(_str)->value;
     size_t pos = _pos ? correctIndex(_pos, length) : 0;
     size_t len = str.size();
     if(pos+len > length)

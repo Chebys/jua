@@ -14,264 +14,275 @@ static_assert(
     sizeof(double)==8,
     "Incapable platform"
 );
-using std::string;
-using std::initializer_list;
+namespace Jua {
 
-struct JuaVM;
-struct Jua_Val;
-struct Jua_Obj;
-struct Jua_Bool;
-struct Jua_Func;
-typedef std::deque<Jua_Val*> jualist;
+struct VM;
+struct Value;
+struct Object;
+struct Boolean;
+struct Function;
+typedef std::deque<Value*> jualist;
 struct JuaIterator;
 
-void d_log(const string&);
+void d_log(const std::string&);
 void d_log(char c);
-void d_log(Jua_Val*);
-void d_log(string, Jua_Val*);
-void d_log(string, int);
+void d_log(Value*);
+void d_log(std::string, Value*);
+void d_log(std::string, int);
 
-struct Jua_Val{
-    JuaVM* vm = nullptr; //指向JuaVM实例
+struct Value{
+    VM* vm = nullptr; //指向JuaVM实例
     enum JuaType{Obj, Null, Str, Num, Bool, Func};
     JuaType type;
     size_t id = -1;
-    Jua_Obj* proto;
-    size_t ref = 0;
-    Jua_Val(JuaVM* vm_, JuaType t, Jua_Obj* p = nullptr): vm(vm_), type(t), proto(p){}
-    void addRef(){ ref++; }
-    void release();
+    Object* proto;
+    Value(VM* vm_, JuaType t, Object* p = nullptr): vm(vm_), type(t), proto(p){}
     virtual bool isType(int type_id){
-        //用于自定义类型判断（自定义类型应当是 Jua_Obj 的子类）
+        //用于自定义类型判断（自定义类型应当是 Object 的子类）
         //保留的 type_id:
         // 0: 未使用
         // 1: Scope
-        // 2: Jua_Array
-        // 3: Jua_Buffer
-        // 4-15: 未使用
+        // 2: Array
+        // 3: Buffer
+        // 4: Coroutine
+        // 5-15: 未使用
         return false;
     }
-    virtual Jua_Val* getOwn(const string& key){
+    virtual Value* getOwn(const std::string& key){
         return nullptr;
     }
-    Jua_Val* getOwn(const char* key){
-        string str(key);
+    Value* getOwn(const char* key){
+        std::string str(key);
         return getOwn(str);
     }
-    virtual Jua_Val* inheritProp(const string&); //返回jua值或nullptr
-    Jua_Val* getProp(const string&);
-    Jua_Val* getProp(const char* key){
-        string str(key);
+    virtual Value* inheritProp(const std::string&); //返回jua值或nullptr
+    Value* getProp(const std::string&);
+    Value* getProp(const char* key){
+        std::string str(key);
         return getProp(str);
     }
-    Jua_Func* getMetaMethod(const string&);
-    Jua_Func* getMetaMethod(const char* key){
-        string str(key);
+    Function* getMetaMethod(const std::string&);
+    Function* getMetaMethod(const char* key){
+        std::string str(key);
         return getMetaMethod(str);
     }
     //以下均不会返回 nullptr
-    virtual Jua_Bool* hasItem(Jua_Val*);
-    virtual Jua_Val* getItem(Jua_Val*);
-    virtual void setItem(Jua_Val*, Jua_Val*);
-    virtual Jua_Val* call(jualist&);
-    Jua_Val* call(initializer_list<Jua_Val*> args){
+    virtual Boolean* hasItem(Value*);
+    virtual Value* getItem(Value*);
+    virtual void setItem(Value*, Value*);
+    virtual Value* call(jualist&);
+    Value* call(std::initializer_list<Value*> args){
         jualist list = args;
         return call(list);
     }
-    virtual Jua_Val* unm();
-    virtual Jua_Val* add(Jua_Val*);
-    virtual Jua_Val* sub(Jua_Val*);
-    virtual Jua_Val* mul(Jua_Val*);
-    virtual Jua_Val* div(Jua_Val*);
-    Jua_Bool* eq(Jua_Val*); //子类应当重写 operator==
-    virtual Jua_Bool* lt(Jua_Val*);
-    virtual Jua_Bool* le(Jua_Val*);
-    virtual Jua_Val* range(Jua_Val*);
+    virtual Value* unm();
+    virtual Value* add(Value*);
+    virtual Value* sub(Value*);
+    virtual Value* mul(Value*);
+    virtual Value* div(Value*);
+    Boolean* eq(Value*); //子类应当重写 operator==
+    virtual Boolean* lt(Value*);
+    virtual Boolean* le(Value*);
+    virtual Value* range(Value*);
 
-    virtual JuaIterator* getIterator(Jua_Func* next=nullptr); //优先使用元方法 "next"
+    virtual JuaIterator* getIterator(Function* next=nullptr); //优先使用元方法 "next"
     virtual void collectItems(jualist&); //仅用于可迭代对象
-    virtual bool operator==(Jua_Val* val);
-    virtual string toString() = 0; //const string& str = toString()
-    virtual string safeToString(){ return toString(); }
+    virtual bool operator==(Value* val);
+    virtual std::string toString() = 0; //const std::string& str = toString()
+    virtual std::string safeToString(){ return toString(); }
     virtual bool toBoolean(){ return true; }
-    virtual Jua_Bool* toJuaBool();
+    virtual Boolean* toJuaBool();
     virtual int64_t toInt(); //仅用于数字
     virtual double toNumber(); //仅用于数字
-    virtual string getTypeName() = 0;
+    virtual std::string getTypeName() = 0;
     virtual void gc();
 };
 
-struct Jua_Null: Jua_Val{
-    string toString(){ return "null"; }
+struct Null: Value{
+    std::string toString(){ return "null"; }
     bool toBoolean(){ return false; }
-    string getTypeName(){ return "null"; }
+    std::string getTypeName(){ return "null"; }
     void gc(){}
-    static Jua_Null* getInst(){
-        static Jua_Null* inst = new Jua_Null;
+    static Null* getInst(){
+        static Null* inst = new Null;
         return inst;
     }
     private:
-    Jua_Null(): Jua_Val(nullptr, Null){}
+    Null(): Value(nullptr, Value::Null){}
 };
-struct Jua_Obj: Jua_Val{
-    std::unordered_map<string, Jua_Val*> dict;
-    Jua_Obj(JuaVM* vm_, Jua_Obj* p = nullptr);
-    ~Jua_Obj();
-    bool hasOwn(Jua_Val* key);
-    Jua_Val* getOwn(size_t hash, const string& key); //todo
-    Jua_Val* getOwn(const string& key){
+struct Object: Value{
+    std::unordered_map<std::string, Value*> dict;
+    Object(VM* vm_, Object* p = nullptr);
+    ~Object();
+    bool hasOwn(Value* key);
+    Value* getOwn(size_t hash, const std::string& key); //todo
+    Value* getOwn(const std::string& key){
         if(dict.contains(key))return dict[key];
         return nullptr;
     }
-    Jua_Val* getOwn(const char* key){
-        string str(key);
+    Value* getOwn(const char* key){
+        std::string str(key);
         return getOwn(str);
     }
-    void setProp(const string& key, Jua_Val* val);
-    void delProp(const string& key);
-    Jua_Bool* hasItem(Jua_Val* key);
-    Jua_Val* getItem(Jua_Val* key);
-    void setItem(Jua_Val* key, Jua_Val* val);
+    void setProp(const std::string& key, Value* val);
+    void delProp(const std::string& key);
+    Boolean* hasItem(Value* key);
+    Value* getItem(Value* key);
+    void setItem(Value* key, Value* val);
     bool isPropTrue(const char* key);
-    void assignProps(Jua_Obj* obj);
-    string toString();
-    string safeToString(); //不调用元方法
-    string getTypeName(){ return "object"; }
+    void assignProps(Object* obj);
+    std::string toString();
+    std::string safeToString(); //不调用元方法
+    std::string getTypeName(){ return "object"; }
 };
-struct Jua_Bool: Jua_Val{
+struct Boolean: Value{
     bool value;
-    string toString(){
+    std::string toString(){
         return value ? "true" : "false";
     }
     bool toBoolean(){ return value; }
-    string getTypeName(){ return "boolean"; }
+    std::string getTypeName(){ return "boolean"; }
     void gc(){}
-    static Jua_Bool* getInst(bool v){
-        static Jua_Bool* t = new Jua_Bool(true);
-        static Jua_Bool* f = new Jua_Bool(false);
+    static Boolean* getInst(bool v){
+        static Boolean* t = new Boolean(true);
+        static Boolean* f = new Boolean(false);
         return v ? t : f;
     }
     private:
-    Jua_Bool(bool v): Jua_Val(nullptr, Bool), value(v){}
+    Boolean(bool v): Value(nullptr, Bool), value(v){}
 };
-struct Jua_Num: Jua_Val{
+struct Number: Value{
     double value;
-    Jua_Num(JuaVM* vm, double v);
-    Jua_Val* unm();
-    Jua_Val* add(Jua_Val*);
-    Jua_Val* sub(Jua_Val*);
-    Jua_Val* mul(Jua_Val*);
-    Jua_Val* div(Jua_Val*);
-    Jua_Bool* lt(Jua_Val*);
-    Jua_Bool* le(Jua_Val*);
-    Jua_Val* range(Jua_Val*);
-    bool operator==(Jua_Val* val);
-    string toString();
+    Number(VM* vm, double v);
+    Value* unm();
+    Value* add(Value*);
+    Value* sub(Value*);
+    Value* mul(Value*);
+    Value* div(Value*);
+    Boolean* lt(Value*);
+    Boolean* le(Value*);
+    Value* range(Value*);
+    bool operator==(Value* val);
+    std::string toString();
     bool toBoolean(){ return value; }
     int64_t toInt(){ return std::round(value); }
     double toNumber(){ return value; }
-    string getTypeName(){ return "number"; }
+    std::string getTypeName(){ return "number"; }
 };
-struct Jua_Str: Jua_Val{
-    string value;
-    Jua_Str(JuaVM* vm_, const string& v = "");
-    Jua_Bool* hasItem(Jua_Val*);
-    Jua_Val* getItem(Jua_Val*);
-    Jua_Val* add(Jua_Val* val);
-    bool operator==(Jua_Val *);
-    string toString(){ return value; }
+struct String: Value{
+    std::string value;
+    String(VM* vm_, const std::string& v = "");
+    Boolean* hasItem(Value*);
+    Value* getItem(Value*);
+    Value* add(Value* val);
+    bool operator==(Value *);
+    std::string toString(){ return value; }
     bool toBoolean(){ return value.size(); }
-    string getTypeName(){ return "string"; }
+    std::string getTypeName(){ return "std::string"; }
 };
-struct Jua_Func: Jua_Val{
-    Jua_Func(JuaVM* vm_): Jua_Val(vm_, Func){}
-    string toString(){ return "<function>"; }
-    string getTypeName(){ return "function"; }
+struct Function: Value{
+    Function(VM* vm_): Value(vm_, Func){}
+    std::string toString(){ return "<function>"; }
+    std::string getTypeName(){ return "function"; }
 };
 
-struct Scope: Jua_Obj{
+struct Scope: Object{
     static const int type_id = 1;
     Scope* parent;
-    Scope(JuaVM* vm_, Scope* p=nullptr): Jua_Obj(vm_, p), parent(p){ if(p)p->addRef(); }
+    Scope(VM* vm_, Scope* p=nullptr): Object(vm_, p), parent(p){}
     Scope(Scope* p): Scope(p->vm, p){} //从父作用域创建新作用域
-    ~Scope(){
-        if(parent)parent->release();
-    }
     bool isType(int type_id) override {
         return type_id == Scope::type_id;
     }
-    Jua_Val* inheritProp(const string&) override;
-    void assign(const string& key, Jua_Val* val){
+    Value* inheritProp(const std::string&) override;
+    void assign(const std::string& key, Value* val){
         for(auto scope = this; scope; scope = scope->parent){
             if(scope->dict.contains(key)){
                 scope->setProp(key, val);
                 return;
             }
         }
-        throw string("Variable not found: ") + key;
+        throw std::string("Variable not found: ") + key;
     }
 };
-struct Jua_NativeFunc: Jua_Func{
-    typedef std::function<Jua_Val*(jualist&)> Native; //可返回 nullptr
+struct NativeFunction: Function{
+    typedef std::function<Value*(jualist&)> Native; //可返回 nullptr
     Native native;
-    Jua_NativeFunc(JuaVM* vm_, Native fn): Jua_Func(vm_), native(fn){}
-    Jua_Val* call(jualist& args){
+    NativeFunction(VM* vm_, Native fn): Function(vm_), native(fn){}
+    Value* call(jualist& args){
         auto res = native(args);
         if(res)return res;
-        return Jua_Null::getInst();
+        return Null::getInst();
     }
 };
-struct Jua_Array: Jua_Obj{
+struct Array: Object{
     static const int type_id = 2;
     jualist items;
-    Jua_Array(JuaVM*, const jualist&);
+    Array(VM*, const jualist&);
     bool isType(int type_id) override {
-        return type_id == Jua_Array::type_id;
+        return type_id == Array::type_id;
     }
-    Jua_Val* getItem(Jua_Val*);
-    void setItem(Jua_Val*, Jua_Val*);
-    JuaIterator* getIterator(Jua_Func* next=nullptr) override;
+    Value* getItem(Value*);
+    void setItem(Value*, Value*);
+    JuaIterator* getIterator(Function* next=nullptr) override;
     void collectItems(jualist& list) override {
         for(auto& item : items){
             list.push_back(item);
         }
     }
 };
-struct Jua_Buffer: Jua_Obj{
+struct Buffer: Object{
     static const int type_id = 3;
     uint8_t* bytes;
     size_t length;
-    Jua_Buffer(JuaVM*, size_t);
-    ~Jua_Buffer(){ delete bytes; }
-    bool isType(int type_id) override {
-        return type_id == Jua_Buffer::type_id;
+    bool shared = false;
+    Buffer(VM*, uint8_t*, size_t, bool shared=true);
+    Buffer(VM*, size_t);
+    ~Buffer(){
+        if(!shared) delete bytes;
     }
-    Jua_Val* getItem(Jua_Val*);
-    void setItem(Jua_Val*, Jua_Val*);
-    Jua_Val* read(Jua_Val* start=nullptr, Jua_Val* end=nullptr);
-    void write(Jua_Val* str, Jua_Val* pos=nullptr);
+    bool isType(int type_id) override {
+        return type_id == Buffer::type_id;
+    }
+    Value* getItem(Value*);
+    void setItem(Value*, Value*);
+    Value* read(Value* start=nullptr, Value* end=nullptr);
+    void write(Value* str, Value* pos=nullptr);
+};
+struct Coroutine: Object{ //抽象类
+    static const int type_id = 4;
+    Coroutine(VM* vm_): Object(vm_){}
+    bool isType(int type_id) override {
+        return type_id == Coroutine::type_id;
+    }
+    virtual Value* resume(jualist&) = 0;
+    std::string toString(){
+        return "<coroutine>";
+    }
 };
 
 struct JuaIterator{
-    virtual Jua_Val* next() = 0; //迭代完成时返回 nullptr
+    virtual Value* next() = 0; //迭代完成时返回 nullptr
 };
 struct JuaError{
-    string message;
-    JuaError(string msg): message(msg){}
+    std::string message;
+    JuaError(std::string msg): message(msg){}
     JuaError(): JuaError("Unknown JuaError"){}
-    virtual string toDebugString();
+    virtual std::string toDebugString();
 };
 struct JuaErrorWithVal: JuaError{
-    Jua_Val* val;
-    JuaErrorWithVal(string msg, Jua_Val* v): JuaError(msg), val(v){}
-    string toDebugString(){
-        string str = message;
+    Value* val;
+    JuaErrorWithVal(std::string msg, Value* v): JuaError(msg), val(v){}
+    std::string toDebugString(){
+        std::string str = message;
         str.append("\n\twith value: ");
         str.append(val ? val->safeToString() : "nullptr");
         return str;
     }
 };
 struct JuaTypeError: JuaError{
-    JuaTypeError(string msg): JuaError(msg){}
-    string toDebugString(){ return "JuaTypeError: " + message; }
+    JuaTypeError(std::string msg): JuaError(msg){}
+    std::string toDebugString(){ return "JuaTypeError: " + message; }
 };
+
+}

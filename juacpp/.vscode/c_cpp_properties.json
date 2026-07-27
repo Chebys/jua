@@ -5,8 +5,7 @@
             "includePath": [
                 "${workspaceFolder}/**",
                 "${workspaceFolder}",
-                "${workspaceFolder}/include",
-                "C:/Users/86150/Documents/cpp/WebView2Test/include"
+                "${workspaceFolder}/include"
             ],
             "defines": [
                 "_DEBUG",

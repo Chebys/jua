@@ -67,14 +67,14 @@ inline std::unordered_map<BinOper, int> binOperPriority{
     {BinOper::or_, 3}
 };
 
-inline Jua_Val* operate(UniOper type, Jua_Val* val){
+inline Value* operate(UniOper type, Value* val){
     switch (type){
         case UniOper::unm: return val->unm();
-        case UniOper::not_: return Jua_Bool::getInst(!val->toBoolean());
+        case UniOper::not_: return Boolean::getInst(!val->toBoolean());
         default: throw "todo: UniOper";
     }
 }
-inline Jua_Val* operate(BinOper type, Jua_Val* left, Jua_Val* right){
+inline Value* operate(BinOper type, Value* left, Value* right){
     //短路不在此处理
     switch(type){
         case BinOper::add: return left->add(right);
@@ -84,10 +84,10 @@ inline Jua_Val* operate(BinOper type, Jua_Val* left, Jua_Val* right){
         case BinOper::range: return left->range(right);
         case BinOper::lt: return left->lt(right);
         case BinOper::le: return left->le(right);
-        case BinOper::gt: return Jua_Bool::getInst(!left->le(right)->toBoolean());
-        case BinOper::ge: return Jua_Bool::getInst(!left->lt(right)->toBoolean());
+        case BinOper::gt: return Boolean::getInst(!left->le(right)->toBoolean());
+        case BinOper::ge: return Boolean::getInst(!left->lt(right)->toBoolean());
         case BinOper::eq: return left->eq(right);
-        case BinOper::ne: return Jua_Bool::getInst(!(*left == right));
+        case BinOper::ne: return Boolean::getInst(!(*left == right));
         case BinOper::in: return right->hasItem(left);
     }
     d_log(int(type));

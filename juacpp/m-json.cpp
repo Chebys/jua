@@ -1,20 +1,20 @@
 #include "jua-value.h"
 #include "jua-vm.h"
-bool is_func(Jua_Val* val){
-    return val->type == Jua_Val::Func;
+bool is_func(Value* val){
+    return val->type == Value::Func;
 }
 struct InvalidJSONException: JuaError{
     InvalidJSONException(const string& msg): JuaError("Invalid JSON: " + msg) {}
 };
-string encode(Jua_Val* val){
+string encode(Value* val){
     switch(val->type){
-        case Jua_Val::Null:
+        case Value::Null:
             return "null";
-        case Jua_Val::Bool:
+        case Value::Bool:
             return val->toBoolean() ? "true" : "false";
-        case Jua_Val::Num:
+        case Value::Num:
             return val->toString();
-        case Jua_Val::Str: {
+        case Value::Str: {
             string str = val->toString();
             string res = "\"";
             for(char c: str){
@@ -39,9 +39,9 @@ string encode(Jua_Val* val){
             res += "\"";
             return res;
         }
-        case Jua_Val::Obj: {
-            if(val->isType(Jua_Array::type_id)){
-                auto arr = static_cast<Jua_Array*>(val);
+        case Value::Obj: {
+            if(val->isType(Array::type_id)){
+                auto arr = static_cast<Array*>(val);
                 string res = "[";
                 for(size_t i=0; i<arr->items.size(); i++){
                     if(is_func(arr->items[i]))continue;
@@ -51,14 +51,14 @@ string encode(Jua_Val* val){
                 res += "]";
                 return res;
             }else{
-                auto obj = static_cast<Jua_Obj*>(val);
+                auto obj = static_cast<Object*>(val);
                 string res = "{";
                 bool first = true;
                 for(auto& [key, value]: obj->dict){
                     if(is_func(value))continue;
                     if(!first) res += ",";
                     first = false;
-                    res += encode(new Jua_Str(val->vm, key));
+                    res += encode(new String(val->vm, key));
                     res += ":";
                     res += encode(value);
                 }
@@ -71,8 +71,8 @@ string encode(Jua_Val* val){
     }
 }
 
-Jua_Val* decode(JuaVM* vm, const string& str, size_t& pos);
-Jua_Str* decode_string(JuaVM* vm, const string& str, size_t& pos){
+Value* decode(VM* vm, const string& str, size_t& pos);
+String* decode_string(VM* vm, const string& str, size_t& pos){
     //从'"'开始解析
     pos++;
     size_t start = pos;
@@ -81,7 +81,7 @@ Jua_Str* decode_string(JuaVM* vm, const string& str, size_t& pos){
         char c = str[pos];
         if(c == '\"'){
             pos++;
-            return new Jua_Str(vm, result);
+            return new String(vm, result);
         }else if(c == '\\'){
             pos++;
             if(pos >= str.size()){
@@ -124,7 +124,7 @@ Jua_Str* decode_string(JuaVM* vm, const string& str, size_t& pos){
     }
     throw new InvalidJSONException("Unterminated string starting at position " + std::to_string(start-1));
 }
-Jua_Num* decode_number(JuaVM* vm, const string& str, size_t& pos){
+Number* decode_number(VM* vm, const string& str, size_t& pos){
     size_t start = pos;
     bool has_decimal = false;
     bool has_exponent = false;
@@ -150,16 +150,16 @@ Jua_Num* decode_number(JuaVM* vm, const string& str, size_t& pos){
     string num_str = str.substr(start, pos - start);
     try {
         double value = std::stod(num_str);
-        return new Jua_Num(vm, value);
+        return new Number(vm, value);
     } catch (...) {
         throw new InvalidJSONException("Invalid number at position " + std::to_string(start));
     }
 }
-Jua_Array* decode_array(JuaVM* vm, const string& str, size_t& pos){
+Array* decode_array(VM* vm, const string& str, size_t& pos){
     //从'['开始解析
     //未完全遵循 JSON 标准（允许尾逗号，允许省略逗号）
     pos++;
-    auto arr = new Jua_Array(vm, {});
+    auto arr = new Array(vm, {});
     while(pos < str.size()){
         if(isspace(str[pos])){
             pos++;
@@ -179,11 +179,11 @@ Jua_Array* decode_array(JuaVM* vm, const string& str, size_t& pos){
     }
     throw new InvalidJSONException("Missing closing ']'");
 }
-Jua_Obj* decode_object(JuaVM* vm, const string& str, size_t& pos){
+Object* decode_object(VM* vm, const string& str, size_t& pos){
     //从'{'开始解析
     //未完全遵循 JSON 标准（允许尾逗号，允许省略逗号）
     pos++;
-    auto obj = new Jua_Obj(vm);
+    auto obj = new Object(vm);
     while(pos < str.size()){
         if(isspace(str[pos])){
             pos++;
@@ -217,30 +217,30 @@ Jua_Obj* decode_object(JuaVM* vm, const string& str, size_t& pos){
     }
     throw new InvalidJSONException("Missing closing '}'");
 }
-Jua_Val* decode(JuaVM* vm, const string& str){
+Value* decode(VM* vm, const string& str){
     size_t pos = 0;
     auto val = decode(vm, str, pos);
     //这里可以检查 pos 是否到达末尾
     return val;
 }
-Jua_Val* decode(JuaVM* vm, const string& str, size_t& pos){
+Value* decode(VM* vm, const string& str, size_t& pos){
     switch(str[pos]){
         case 'n':
             if(str.compare(pos, 4, "null") == 0){
                 pos += 4;
-                return Jua_Null::getInst();
+                return Null::getInst();
             }
             break;
         case 't':
             if(str.compare(pos, 4, "true") == 0){
                 pos += 4;
-                return Jua_Bool::getInst(true);
+                return Boolean::getInst(true);
             }
             break;
         case 'f':
             if(str.compare(pos, 5, "false") == 0){
                 pos += 5;
-                return Jua_Bool::getInst(false);
+                return Boolean::getInst(false);
             }
             break;
         case '\"':
@@ -257,17 +257,17 @@ Jua_Val* decode(JuaVM* vm, const string& str, size_t& pos){
     throw new InvalidJSONException("Unexpected character at position " + std::to_string(pos));
 }
 
-Jua_Obj* JuaVM::makeJSON(){
-    auto proto = new Jua_Obj(this, ObjectProto);
+Object* VM::makeJSON(){
+    auto proto = new Object(this, ObjectProto);
     proto->setProp("encode", makeFunc([this](jualist& args){
         if(args.size() < 1)
             throw new JuaError("JSON.stringify() requires at least 1 argument");
-        return new Jua_Str(this, encode(args[0]));
+        return new String(this, encode(args[0]));
     }));
     proto->setProp("decode", makeFunc([this](jualist& args){
         if(args.size() < 1)
             throw new JuaError("JSON.parse() requires at least 1 argument");
-        if(args[0]->type != Jua_Val::Str)
+        if(args[0]->type != Value::Str)
             throw new JuaTypeError("JSON.parse() requires a string argument");
         return decode(this, args[0]->toString());
     }));

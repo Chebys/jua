@@ -2,16 +2,17 @@
 #include "jua-syntax.h"
 #include "coding.h"
 
-JuaVM::JuaVM(){
+using namespace Jua;
+using std::string;
+
+VM::VM(){
     initBuiltins();
     makeGlobal();
     modules["math"] = makeMath();
-    modules["math"]->addRef();
     modules["json"] = makeJSON();
-    modules["json"]->addRef();
 }
 
-void JuaVM::run(const string& script){
+void VM::run(const string& script){
     try{
         auto val = eval(script);
         val->gc();
@@ -20,26 +21,31 @@ void JuaVM::run(const string& script){
     }
 }
 
-Jua_Val* JuaVM::eval(const string& script){
+Value* VM::eval(const string& script){
     //返回非空指针，可能需要垃圾回收
     //d_log("eval");
     //d_log(script);
     auto body = parse(script);
     return body->exec(new Scope(_G));
 }
-void JuaVM::initBuiltins(){
+
+void VM::own(Value* value){
+    ownedValues.insert(value);
+}
+
+void VM::initBuiltins(){
     obj_new = makeFunc([this](jualist& args){
-        Jua_Val* proto = nullptr;
+        Value* proto = nullptr;
         if(args.size() > 0){
             proto = args[0];
-            if(proto->type == Jua_Val::Null){
+            if(proto->type == Value::Null){
                 proto = nullptr;
-            }else if(proto->type != Jua_Val::Obj){
+            }else if(proto->type != Value::Obj){
                 throw new JuaError("Object.new() requires an object prototype");
             }
             args.pop_front();
         }
-        auto obj = new Jua_Obj(this, static_cast<Jua_Obj*>(proto));
+        auto obj = new Object(this, static_cast<Object*>(proto));
         if(proto){
             auto init = obj->getMetaMethod("init");
             if(init){
@@ -52,38 +58,38 @@ void JuaVM::initBuiltins(){
     obj_next = makeFunc([](jualist& args){
         if(args.size() < 2) throw "Range.next() requires 2 arguments";
         auto self = args[0];
-        if(self->type != Jua_Val::Obj){
+        if(self->type != Value::Obj){
             throw new JuaError("Range.next() called on a non-object");
         }
-        auto obj = static_cast<Jua_Obj*>(self);
+        auto obj = static_cast<Object*>(self);
         auto key = args[1];
-        std::unordered_map<string, Jua_Val*>::iterator it;
-        if(key->type == Jua_Val::Str){
+        std::unordered_map<string, Value*>::iterator it;
+        if(key->type == Value::Str){
             string str_key = key->toString();
             it = obj->dict.find(str_key);
             it++;
         }else{
             it = obj->dict.begin();
         }
-        auto res = new Jua_Obj(self->vm);
+        auto res = new Object(self->vm);
         if(it == obj->dict.end()){
-            res->setProp("done", Jua_Bool::getInst(true));
+            res->setProp("done", Boolean::getInst(true));
         }else{
-            auto value = new Jua_Str(self->vm, it->first);
-            res->setProp("done", Jua_Bool::getInst(false));
+            auto value = new String(self->vm, it->first);
+            res->setProp("done", Boolean::getInst(false));
             res->setProp("key", value);
             res->setProp("value", value);
         }
         return res;
     });
-    classProto = new Jua_Obj(this); //标准可构造类的原型，首先初始化
-    classProto->setProp("__class", Jua_Bool::getInst(true));
+    classProto = new Object(this); //标准可构造类的原型，首先初始化
+    classProto->setProp("__class", Boolean::getInst(true));
     classProto->setProp("__call", obj_new);
 
     RangeProto = makeRangeProto(); //必须在 NumberProto 之前
     NumberProto = makeNumberProto();
     StringProto = makeStringProto();
-    BooleanProto = new Jua_Obj(this);
+    BooleanProto = new Object(this);
     FunctionProto = makeFunctionProto();
     ObjectProto = makeObjectProto();
 
@@ -92,7 +98,7 @@ void JuaVM::initBuiltins(){
     ErrorProto = makeErrorProto();
     TryResProto = makeTryResProto();
 }
-void JuaVM::makeGlobal(){
+void VM::makeGlobal(){
     _G = new Scope(this);
     _G->setProp("String", StringProto);
     _G->setProp("Number", NumberProto);
@@ -103,16 +109,15 @@ void JuaVM::makeGlobal(){
     _G->setProp("Buffer", BufferProto);
     _G->setProp("Range", RangeProto);
     _G->setProp("Error", ErrorProto);
-    _G->addRef();
     _G->setProp("_G", _G);
     _G->setProp("print", makeFunc([this](jualist& args){
         j_stdout(args);
-        return Jua_Null::getInst();
+        return Null::getInst();
     }));
     _G->setProp("class", makeFunc([this](jualist& args){
         if(args.size() < 1) throw "class() requires at least one argument";
-        Jua_Val* proto = args[0];
-        if(proto->type != Jua_Val::Obj){
+        Value* proto = args[0];
+        if(proto->type != Value::Obj){
             throw new JuaError("class() requires an object prototype");
         }
         proto->proto = classProto; //todo: 如果采用引用计数，需要设置一个统一的入口来修改 proto
@@ -120,47 +125,47 @@ void JuaVM::makeGlobal(){
     }));
     _G->setProp("require", makeFunc([this](jualist& args){
         if(args.size() < 1) throw "require() requires at least one argument";
-        if(args[0]->type != Jua_Val::Str){
+        if(args[0]->type != Value::Str){
             throw new JuaError("require() requires a string argument");
         }
         return require(args[0]->toString());
     }));
     _G->setProp("throw", makeFunc([this](jualist& args){
         if(args.size() < 1) throw "throw() requires at least one argument";
-        Jua_Val* val = args[0];
+        Value* val = args[0];
         //todo: 允许抛出对象
-        if(val->type != Jua_Val::Str){
+        if(val->type != Value::Str){
             throw new JuaError("throw() requires a string argument");
         }
         throw new JuaError(val->toString());
-        return Jua_Null::getInst(); // unreachable, but required for function signature
+        return Null::getInst(); // unreachable, but required for function signature
     }));
     _G->setProp("try", makeFunc([this](jualist& args){
-        auto res = new Jua_Obj(this, TryResProto);
+        auto res = new Object(this, TryResProto);
         try{
             if(args.size() < 1) throw "try() requires at least one argument";
-            Jua_Val* fn = args[0];
-            if(fn->type != Jua_Val::Func){
+            Value* fn = args[0];
+            if(fn->type != Value::Func){
                 throw new JuaError("try() requires a function argument");
             }
             args.pop_front();
             res->setProp("value", fn->call(args));
-            res->setProp("status", Jua_Bool::getInst(true));
+            res->setProp("status", Boolean::getInst(true));
             return res;
         } catch (JuaError* e) {
-            res->setProp("error", new Jua_Str(this, e->toDebugString()));
-            res->setProp("status", Jua_Bool::getInst(false));
+            res->setProp("error", new String(this, e->toDebugString()));
+            res->setProp("status", Boolean::getInst(false));
             return res;
         }
     }));
     _G->setProp("type", makeFunc([this](jualist& args){
         if(args.size() < 1) throw "type() requires at least one argument";
-        Jua_Val* val = args[0];
+        Value* val = args[0];
         auto typeName = val->getTypeName();
-        return new Jua_Str(this, typeName);
+        return new String(this, typeName);
     }));
 }
-Jua_Val* JuaVM::require(const string& name){
+Value* VM::require(const string& name){
     if(modules.contains(name))return modules[name];
     //todo: 检查循环导入
     const string& script = findModule(name);
@@ -168,66 +173,66 @@ Jua_Val* JuaVM::require(const string& name){
     return modules[name];
 }
 
-Jua_Obj* JuaVM::buildClass(Jua_NativeFunc::Native constructor){
+Object* VM::buildClass(NativeFunction::Native constructor){
     //constructor 接收初始化参数（不包括类自身），返回类实例
-    auto clsProto = new Jua_Obj(this);
-    clsProto->setProp("__class", Jua_Bool::getInst(true));
+    auto clsProto = new Object(this);
+    clsProto->setProp("__class", Boolean::getInst(true));
     clsProto->setProp("__call", makeFunc([this, constructor](jualist& args){
         args.pop_front(); // 移除类本身
         return constructor(args);
     }));
-    auto cls = new Jua_Obj(this, clsProto);
+    auto cls = new Object(this, clsProto);
     return cls;
 }
 
-Jua_Obj* JuaVM::makeRangeProto(){
-    auto proto = new Jua_Obj(this, classProto);
+Object* VM::makeRangeProto(){
+    auto proto = new Object(this, classProto);
     proto->setProp("init", makeFunc([](jualist& args){
         if(args.size() < 3) throw "range() requires 3 arguments";
         auto self = args[0];
-        if(self->type != Jua_Val::Obj)
+        if(self->type != Value::Obj)
             throw new JuaError("range() called on non-object value");
-        auto obj = static_cast<Jua_Obj*>(self);
+        auto obj = static_cast<Object*>(self);
         double start = args[1]->toNumber();
         double end = args[2]->toNumber();
         double step = 1;
         if(args.size() >= 4){
             step = args[4]->toNumber();
         }
-        obj->setProp("start", new Jua_Num(self->vm, start));
-        obj->setProp("end", new Jua_Num(self->vm, end));
-        obj->setProp("step", new Jua_Num(self->vm, step));
-        return Jua_Null::getInst();
+        obj->setProp("start", new Number(self->vm, start));
+        obj->setProp("end", new Number(self->vm, end));
+        obj->setProp("step", new Number(self->vm, step));
+        return Null::getInst();
     }));
     proto->setProp("next", makeFunc([](jualist& args){
         //todo: 支持浮点数
         if(args.size() < 2) throw "Range.next() requires 2 arguments";
         auto self = args[0];
-        if(self->type != Jua_Val::Obj){
+        if(self->type != Value::Obj){
             throw new JuaError("Range.next() called on a non-object");
         }
         auto key = args[1];
         size_t index;
-        if(key->type == Jua_Val::Num){
+        if(key->type == Value::Num){
             auto step = self->getProp("step");
-            if(!step || step->type != Jua_Val::Num)
+            if(!step || step->type != Value::Num)
                 throw new JuaError("Range.next() called on a non-range object");
             index = key->toInt() + step->toInt();
         }else{
             auto start = self->getProp("start");
-            if(!start || start->type != Jua_Val::Num)
+            if(!start || start->type != Value::Num)
                 throw new JuaError("Range.next() called on a non-range object");
             index = start->toInt();
         }
         
         auto end = self->getProp("end");
-        if(!end || end->type != Jua_Val::Num)
+        if(!end || end->type != Value::Num)
             throw new JuaError("Range.next() called on a non-range object");
-        auto res = new Jua_Obj(self->vm);
+        auto res = new Object(self->vm);
         bool done = index >= end->toInt();
-        res->setProp("done", Jua_Bool::getInst(done));
+        res->setProp("done", Boolean::getInst(done));
         if(!done){
-            auto value = new Jua_Num(self->vm, index);
+            auto value = new Number(self->vm, index);
             res->setProp("value", value);
             res->setProp("key", value);
         }
@@ -235,14 +240,14 @@ Jua_Obj* JuaVM::makeRangeProto(){
     }));
     return proto;
 }
-Jua_Obj* JuaVM::makeNumberProto(){
+Object* VM::makeNumberProto(){
     auto proto = buildClass([this](jualist& args){
         double value = 0.0;
         if(args.size() > 0){
-            Jua_Val* arg = args[0];
-            if(arg->type == Jua_Val::Num){
-                value = static_cast<Jua_Num*>(arg)->value;
-            }else if(arg->type == Jua_Val::Str){
+            Value* arg = args[0];
+            if(arg->type == Value::Num){
+                value = static_cast<Number*>(arg)->value;
+            }else if(arg->type == Value::Str){
                 try {
                     value = std::stod(arg->toString());
                 } catch (const std::invalid_argument&) {
@@ -254,9 +259,9 @@ Jua_Obj* JuaVM::makeNumberProto(){
                 throw new JuaError("Number constructor requires a number or string argument");
             }
         }
-        return new Jua_Num(this, value);
+        return new Number(this, value);
     });
-    proto->setProp("LITTLE_ENDIAN", Jua_Bool::getInst(isLittleEndian()));
+    proto->setProp("LITTLE_ENDIAN", Boolean::getInst(isLittleEndian()));
     proto->setProp("range", RangeProto);
     proto->setProp("__range", makeFunc([this](jualist& args){
         if(args.size() < 2)throw new JuaError("requires at least 2 arguments");
@@ -265,15 +270,15 @@ Jua_Obj* JuaVM::makeNumberProto(){
     proto->setProp("toString", makeFunc([](jualist& args){
         if(args.size() < 1) throw new JuaError("Number.toString() requires 1 argument");
         auto self = args[0];
-        if(self->type != Jua_Val::Num){
+        if(self->type != Value::Num){
             throw new JuaError("Number.toString() called on a non-number");
         }
-        return new Jua_Str(self->vm, self->toString());
+        return new String(self->vm, self->toString());
     }));
     proto->setProp("isInt", makeFunc([](jualist& args){
         if(args.size() < 1) throw new JuaError("Number.isInt() requires 1 argument");
         auto val = args[0];
-        if(val->type != Jua_Val::Num)return Jua_Bool::getInst(false);
+        if(val->type != Value::Num)return Boolean::getInst(false);
         throw "todo";
     }));
     proto->setProp("encodeUint8", makeEncodeFunc(encode<uint8_t>));
@@ -294,26 +299,26 @@ Jua_Obj* JuaVM::makeNumberProto(){
     proto->setProp("decodeFloat64", makeDecodeFunc(decode<double>));
     return proto;
 }
-Jua_Obj* JuaVM::makeStringProto(){
+Object* VM::makeStringProto(){
     auto proto = buildClass([this](jualist& args){
         string value;
         if(args.size() > 0){
             value = args[0]->toString();
         }
-        return new Jua_Str(this, value);
+        return new String(this, value);
     });
     proto->setProp("byte", makeFunc([](jualist& args){
         if(args.size() < 1)throw new JuaError("missing argument");
         auto val = args[0];
-        if(val->type != Jua_Val::Str)
+        if(val->type != Value::Str)
             throw new JuaError("String.byte() called on non-string value");
-        auto self = static_cast<Jua_Str*>(val);
+        auto self = static_cast<String*>(val);
         size_t index = 0;
         if(args.size() >= 2){
             index = args[1]->toInt() % self->value.length();
         }
         uint8_t byte = self->value[index];
-        return new Jua_Num(self->vm, byte);
+        return new Number(self->vm, byte);
     }));
     proto->setProp("fromByte", makeFunc([this](jualist& args){
         string str;
@@ -321,22 +326,22 @@ Jua_Obj* JuaVM::makeStringProto(){
         for(auto v: args){
             str.push_back(v->toInt());
         }
-        return new Jua_Str(this, str);
+        return new String(this, str);
     }));
     proto->setProp("len", makeFunc([](jualist& args){
         if(args.size() < 1)throw new JuaError("missing argument");
         auto val = args[0];
-        if(val->type != Jua_Val::Str)
+        if(val->type != Value::Str)
             throw new JuaError("String.len() called on non-string value");
-        auto str = static_cast<Jua_Str*>(val);
-        return new Jua_Num(val->vm, str->value.size());
+        auto str = static_cast<String*>(val);
+        return new Number(val->vm, str->value.size());
     }));
     proto->setProp("toHex", makeFunc([](jualist& args){
         static const char hexDigits[] = "0123456789abcdef";
 
         if(!args.size())throw new JuaError("String.toHex() requires at least 1 argument");
         auto self = args[0];
-        if(self->type != Jua_Val::Str)throw new JuaError("String.toHex() called on non-string value");
+        if(self->type != Value::Str)throw new JuaError("String.toHex() called on non-string value");
         auto str = self->toString();
         string hexStr;
         hexStr.reserve(str.size() * 3);
@@ -346,40 +351,40 @@ Jua_Obj* JuaVM::makeStringProto(){
             hexStr.push_back(' ');
         }
         hexStr.pop_back();
-        return new Jua_Str(self->vm, hexStr);
+        return new String(self->vm, hexStr);
     }));
     proto->setProp("lower", makeFunc([](jualist& args){
         if(!args.size())throw new JuaError("String.lower() requires at least 1 argument");
         auto self = args[0];
-        if(self->type != Jua_Val::Str)throw new JuaError("String.lower() called on non-string value");
+        if(self->type != Value::Str)throw new JuaError("String.lower() called on non-string value");
         auto str = self->toString();
         string lowerStr;
         lowerStr.reserve(str.size());
         for(char c: str){
             lowerStr.push_back(std::tolower(c));
         }
-        return new Jua_Str(self->vm, lowerStr);
+        return new String(self->vm, lowerStr);
     }));
     proto->setProp("upper", makeFunc([](jualist& args){
         if(!args.size())throw new JuaError("String.upper() requires at least 1 argument");
         auto self = args[0];
-        if(self->type != Jua_Val::Str)throw new JuaError("String.upper() called on non-string value");
+        if(self->type != Value::Str)throw new JuaError("String.upper() called on non-string value");
         auto str = self->toString();
         string upperStr;
         upperStr.reserve(str.size());
         for(char c: str){
             upperStr.push_back(std::toupper(c));
         }
-        return new Jua_Str(self->vm, upperStr);
+        return new String(self->vm, upperStr);
     }));
     return proto;
 }
-Jua_Obj* JuaVM::makeFunctionProto(){
+Object* VM::makeFunctionProto(){
     auto proto = buildClass([this](jualist& args){
         if(args.size() < 1) throw new JuaError("Function constructor requires at least one argument");
         std::deque<DeclarationItem*> params;
         for(size_t i=0; i<args.size()-1; i++){
-            if(args[i]->type != Jua_Val::Str){
+            if(args[i]->type != Value::Str){
                 throw new JuaError("Function constructor requires string arguments");
             }
             auto varname = new Varname(args[i]->toString()); //todo: 检查合法性
@@ -393,18 +398,18 @@ Jua_Obj* JuaVM::makeFunctionProto(){
     });
     return proto;
 }
-Jua_Obj* JuaVM::makeObjectProto(){
-    auto proto = new Jua_Obj(this, classProto);
+Object* VM::makeObjectProto(){
+    auto proto = new Object(this, classProto);
     proto->setProp("new", obj_new);
     proto->setProp("get", makeFunc([](jualist& args){
         if(args.size() < 2) throw "Object.get() requires 2 arguments";
         auto self = args[0];
-        if(self->type != Jua_Val::Obj){
+        if(self->type != Value::Obj){
             throw new JuaError("Object.get() called on a non-object");
         }
-        auto obj = static_cast<Jua_Obj*>(self);
+        auto obj = static_cast<Object*>(self);
         auto key = args[1];
-        if(key->type != Jua_Val::Str){
+        if(key->type != Value::Str){
             throw new JuaError("Object.get() requires a string key");
         }
         return obj->getOwn(key->toString());
@@ -412,90 +417,90 @@ Jua_Obj* JuaVM::makeObjectProto(){
     proto->setProp("hasOwn", makeFunc([this](jualist& args){
         if(args.size() < 2) throw "Object.hasOwn() requires 2 arguments";
         auto self = args[0];
-        if(self->type != Jua_Val::Obj){
+        if(self->type != Value::Obj){
             throw new JuaError("Object.hasOwn() called on a non-object");
         }
-        auto obj = static_cast<Jua_Obj*>(self);
+        auto obj = static_cast<Object*>(self);
         auto key = args[1];
-        if(key->type != Jua_Val::Str){
+        if(key->type != Value::Str){
             throw new JuaError("Object.hasOwn() requires a string key");
         }
-        return Jua_Bool::getInst(obj->hasOwn(key));
+        return Boolean::getInst(obj->hasOwn(key));
     }));
     proto->setProp("set", makeFunc([](jualist& args){
         if(args.size() < 3) throw "Object.set() requires 3 arguments";
         auto self = args[0];
-        if(self->type != Jua_Val::Obj){
+        if(self->type != Value::Obj){
             throw new JuaError("Object.set() called on a non-object");
         }
-        auto obj = static_cast<Jua_Obj*>(self);
+        auto obj = static_cast<Object*>(self);
         auto key = args[1];
-        if(key->type != Jua_Val::Str){
+        if(key->type != Value::Str){
             throw new JuaError("Object.set() requires a string key");
         }
         auto value = args[2];
         obj->setProp(key->toString(), value);
-        return Jua_Null::getInst();
+        return Null::getInst();
     }));
     proto->setProp("del", makeFunc([](jualist& args){
         if(args.size() < 2) throw "Object.del() requires 2 arguments";
         auto self = args[0];
-        if(self->type != Jua_Val::Obj){
+        if(self->type != Value::Obj){
             throw new JuaError("Object.del() called on a non-object");
         }
-        auto obj = static_cast<Jua_Obj*>(self);
+        auto obj = static_cast<Object*>(self);
         auto key = args[1];
-        if(key->type != Jua_Val::Str){
+        if(key->type != Value::Str){
             throw new JuaError("Object.del() requires a string key");
         }
         obj->delProp(key->toString());
-        return Jua_Null::getInst();
+        return Null::getInst();
     }));
     proto->setProp("getProto", makeFunc([](jualist& args){
         if(args.size() < 1) throw new JuaError("Object.getProto() requires 1 argument");
-        return args[0]->proto; // nullptr 会自动转换为 Jua_Null
+        return args[0]->proto; // nullptr 会自动转换为 Null
     }));
     proto->setProp("setProto", makeFunc([](jualist& args){
         if(args.size() < 2) throw new JuaError("Object.setProto() requires 2 arguments");
         auto self = args[0];
-        if(self->type != Jua_Val::Obj){
+        if(self->type != Value::Obj){
             throw new JuaError("Object.setProto() called on a non-object");
         }
-        auto obj = static_cast<Jua_Obj*>(self);
+        auto obj = static_cast<Object*>(self);
         auto proto = args[1];
-        if(proto->type != Jua_Val::Obj && proto->type != Jua_Val::Null){
+        if(proto->type != Value::Obj && proto->type != Value::Null){
             throw new JuaError("Object.setProto() requires an object or null prototype");
         }
-        obj->proto = static_cast<Jua_Obj*>(proto);
-        return Jua_Null::getInst();
+        obj->proto = static_cast<Object*>(proto);
+        return Null::getInst();
     }));
     proto->setProp("next", obj_next);
     proto->setProp("toString", makeFunc([](jualist& args){
         if(args.size() < 1) throw "Object.toString() requires 1 argument";
         auto self = args[0];
-        if(self->type != Jua_Val::Obj){
+        if(self->type != Value::Obj){
             throw new JuaError("Object.toString() called on a non-object");
         }
-        return new Jua_Str(self->vm, self->safeToString());
+        return new String(self->vm, self->safeToString());
     }));
     proto->setProp("id", makeFunc([this](jualist& args){
         if(args.size() < 1) throw "Object.id() requires 1 argument";
         auto self = args[0];
-        if(self->type != Jua_Val::Obj && self->type != Jua_Val::Func){
+        if(self->type != Value::Obj && self->type != Value::Func){
             throw new JuaError("Object.id() expected an object or function");
         }
         if(self->id == -1){
             self->id = ++idcounter; // 分配一个唯一的 ID
         }
-        return new Jua_Num(self->vm, self->id);
+        return new Number(self->vm, self->id);
     }));
     return proto;
 }
-Jua_NativeFunc* JuaVM::makeEncodeFunc(Encoder encode){
+NativeFunction* VM::makeEncodeFunc(Encoder encode){
     return makeFunc([this, encode](jualist& args){
-        auto str = new Jua_Str(this, "");
+        auto str = new String(this, "");
         for(auto v: args) {
-            if(v->type != Jua_Val::Num){
+            if(v->type != Value::Num){
                 throw new JuaError("encode() requires number arguments");
             }
             str->value += encode(v->toNumber());
@@ -503,11 +508,11 @@ Jua_NativeFunc* JuaVM::makeEncodeFunc(Encoder encode){
         return str;
     });
 }
-Jua_NativeFunc* JuaVM::makeDecodeFunc(Decoder decode){
+NativeFunction* VM::makeDecodeFunc(Decoder decode){
     return makeFunc([this, decode](jualist& args){
         if(args.size() < 1) throw "decode() requires at least one argument";
-        Jua_Val* val = args[0];
-        if(val->type != Jua_Val::Str){
+        Value* val = args[0];
+        if(val->type != Value::Str){
             throw new JuaError("decode() requires a string argument");
         }
         double result;
@@ -516,32 +521,32 @@ Jua_NativeFunc* JuaVM::makeDecodeFunc(Decoder decode){
         } catch (size_t size) {
             throw new JuaError(std::format("decode() requires a string of at least %zu bytes", size));
         }
-        return new Jua_Num(this, result);
+        return new Number(this, result);
     });
 }
 
-Jua_Obj* JuaVM::makeArrayProto(){
+Object* VM::makeArrayProto(){
     auto proto = buildClass([this](jualist& args){
         if(!args.size())throw new JuaError("Missing argument");
         auto val = args[0];
-        auto arr = new Jua_Array(this, {});
+        auto arr = new Array(this, {});
         val->collectItems(arr->items);
         return arr;
     });
     proto->setProp("hasItem", makeFunc([](jualist& args){
         if(args.size() < 2) throw new JuaError("Array.hasItem() requires 2 arguments");
         auto self = args[0];
-        if(!self->isType(Jua_Array::type_id)){
+        if(!self->isType(Array::type_id)){
             throw new JuaError("Array.hasItem() called on a non-array object");
         }
-        auto arr = static_cast<Jua_Array*>(self);
+        auto arr = static_cast<Array*>(self);
         auto item = args[1];
         for(auto v: arr->items){
             if(*v == item){
-                return Jua_Bool::getInst(true);
+                return Boolean::getInst(true);
             }
         }
-        return Jua_Bool::getInst(false);
+        return Boolean::getInst(false);
     }));
     proto->setProp("join", makeFunc([](jualist& args){
         if(args.size() < 1) throw new JuaError("Array.join() requires at least 1 argument");
@@ -559,29 +564,29 @@ Jua_Obj* JuaVM::makeArrayProto(){
             result += value->toString();
         }
         delete iter;
-        return new Jua_Str(self->vm, result);
+        return new String(self->vm, result);
     }));
     proto->setProp("len", makeFunc([](jualist& args){
         if(args.size() < 1) throw new JuaError("Array.len() requires 1 argument");
         auto self = args[0];
-        if(!self->isType(Jua_Array::type_id)){
+        if(!self->isType(Array::type_id)){
             throw new JuaError("Array.len() called on a non-array object");
         }
-        auto arr = static_cast<Jua_Array*>(self);
-        return new Jua_Num(self->vm, arr->items.size());
+        auto arr = static_cast<Array*>(self);
+        return new Number(self->vm, arr->items.size());
     }));
     proto->setProp("of", makeFunc([this](jualist& args){
-        return new Jua_Array(this, args);
+        return new Array(this, args);
     }));
-    proto->setProp("pop", makeFunc([](jualist& args) -> Jua_Val* {
+    proto->setProp("pop", makeFunc([](jualist& args) -> Value* {
         if(args.size() < 1) throw new JuaError("Array.pop() requires 1 argument");
         auto self = args[0];
-        if(!self->isType(Jua_Array::type_id)){
+        if(!self->isType(Array::type_id)){
             throw new JuaError("Array.pop() called on a non-array object");
         }
-        auto arr = static_cast<Jua_Array*>(self);
+        auto arr = static_cast<Array*>(self);
         if(arr->items.empty()){
-            return Jua_Null::getInst();
+            return Null::getInst();
         }
         auto val = arr->items.back();
         arr->items.pop_back();
@@ -590,24 +595,24 @@ Jua_Obj* JuaVM::makeArrayProto(){
     proto->setProp("push", makeFunc([](jualist& args){
         if(args.size() < 2) throw new JuaError("Array.push() requires at least 1 argument");
         auto self = args[0];
-        if(!self->isType(Jua_Array::type_id)){
+        if(!self->isType(Array::type_id)){
             throw new JuaError("Array.push() called on a non-array object");
         }
-        auto arr = static_cast<Jua_Array*>(self);
+        auto arr = static_cast<Array*>(self);
         for(size_t i=1; i<args.size(); i++){
             arr->items.push_back(args[i]);
         }
-        return Jua_Null::getInst();
+        return Null::getInst();
     }));
-    proto->setProp("shift", makeFunc([](jualist& args) -> Jua_Val* {
+    proto->setProp("shift", makeFunc([](jualist& args) -> Value* {
         if(args.size() < 1) throw new JuaError("Array.shift() requires 1 argument");
         auto self = args[0];
-        if(!self->isType(Jua_Array::type_id)){
+        if(!self->isType(Array::type_id)){
             throw new JuaError("Array.shift() called on a non-array object");
         }
-        auto arr = static_cast<Jua_Array*>(self);
+        auto arr = static_cast<Array*>(self);
         if(arr->items.empty()){
-            return Jua_Null::getInst();
+            return Null::getInst();
         }
         auto val = arr->items.front();
         arr->items.pop_front();
@@ -616,10 +621,10 @@ Jua_Obj* JuaVM::makeArrayProto(){
     proto->setProp("splice", makeFunc([](jualist& args){
         if(args.size() < 3) throw new JuaError("Array.splice() requires at least 3 arguments");
         auto self = args[0];
-        if(!self->isType(Jua_Array::type_id)){
+        if(!self->isType(Array::type_id)){
             throw new JuaError("Array.splice() called on a non-array object");
         }
-        auto arr = static_cast<Jua_Array*>(self);
+        auto arr = static_cast<Array*>(self);
         int start = args[1]->toInt();
         int deleteCount = args[2]->toInt();
         if(start < 0) start = std::max(0, (int)arr->items.size() + start);
@@ -638,7 +643,7 @@ Jua_Obj* JuaVM::makeArrayProto(){
             it = arr->items.insert(it, args[i]);
             it++;
         }
-        return Jua_Null::getInst();
+        return Null::getInst();
     }));
     proto->setProp("toString", makeFunc([](jualist& args){
         if(args.size() < 1) throw new JuaError("Array.toString() requires 1 argument");
@@ -651,28 +656,28 @@ Jua_Obj* JuaVM::makeArrayProto(){
             result += value->toString();
         }
         result += "]";
-        return new Jua_Str(self->vm, result);
+        return new String(self->vm, result);
     }));
     proto->setProp("unshift", makeFunc([](jualist& args){
         if(args.size() < 2) throw new JuaError("Array.unshift() requires at least 1 argument");
         auto self = args[0];
-        if(!self->isType(Jua_Array::type_id)){
+        if(!self->isType(Array::type_id)){
             throw new JuaError("Array.unshift() called on a non-array object");
         }
-        auto arr = static_cast<Jua_Array*>(self);
+        auto arr = static_cast<Array*>(self);
         for(size_t i=args.size()-1; i>=1; i--){
             arr->items.push_front(args[i]);
         }
-        return Jua_Null::getInst();
+        return Null::getInst();
     }));
     return proto;
 }
-Jua_Obj* JuaVM::makeBufferProto(){
+Object* VM::makeBufferProto(){
     auto proto = buildClass([this](jualist& args){
         if(!args.size())
             throw new JuaError("Missing argument");
         auto val = args[0];
-        auto buf = new Jua_Buffer(this, val->toInt());
+        auto buf = new Buffer(this, val->toInt());
         return buf;
     });
     proto->setProp("read", makeFunc([](jualist& args){
@@ -680,68 +685,68 @@ Jua_Obj* JuaVM::makeBufferProto(){
         auto self = args[0],
             start = args.size()>1 ? args[1] : nullptr,
             end = args.size()>2 ? args[2] : nullptr;
-        if(!self->isType(Jua_Buffer::type_id)){
+        if(!self->isType(Buffer::type_id)){
             throw new JuaError("Buffer.read() called on a improper value");
         }
-        auto buf = static_cast<Jua_Buffer*>(self);
+        auto buf = static_cast<Buffer*>(self);
         return buf->read(start, end);
     }));
     proto->setProp("write", makeFunc([](jualist& args){
         if(args.size() < 2) throw new JuaError("Buffer.write() requires at least 2 arguments");
         auto self = args[0], data = args[1], pos = args.size() > 2 ? args[2] : nullptr;
-        if(!self->isType(Jua_Buffer::type_id)){
+        if(!self->isType(Buffer::type_id)){
             throw new JuaError("Buffer.write() called on a improper value");
         }
-        auto buf = static_cast<Jua_Buffer*>(self);
+        auto buf = static_cast<Buffer*>(self);
         buf->write(data, pos);
-        return Jua_Null::getInst();
+        return Null::getInst();
     }));
     return proto;
 }
-Jua_Obj* JuaVM::makeErrorProto(){
-    auto proto = new Jua_Obj(this, classProto);
+Object* VM::makeErrorProto(){
+    auto proto = new Object(this, classProto);
     proto->setProp("init", makeFunc([this](jualist& args){
         auto self = args[0];
-        if(self->type != Jua_Val::Obj)
+        if(self->type != Value::Obj)
             throw new JuaError("Error.init() called on a non-object");
         string message;
         if(args.size() > 1){
             message = args[1]->toString();
         }
-        auto err = static_cast<Jua_Obj*>(self);
-        err->setProp("message", new Jua_Str(this, message));
-        return Jua_Null::getInst();
+        auto err = static_cast<Object*>(self);
+        err->setProp("message", new String(this, message));
+        return Null::getInst();
     }));
-    proto->setProp("name", new Jua_Str(this, "Error"));
+    proto->setProp("name", new String(this, "Error"));
     proto->setProp("toString", makeFunc([](jualist& args){
         if(args.size() < 1) throw new JuaError("Error.toString() requires 1 argument");
         auto self = args[0];
-        if(self->type != Jua_Val::Obj)
+        if(self->type != Value::Obj)
             throw new JuaError("Error.toString() called on a non-object");
-        auto err = static_cast<Jua_Obj*>(self);
+        auto err = static_cast<Object*>(self);
         auto name = err->getProp("name");
         string prefix = name ? name->toString() : "Error";
         auto msg = err->getProp("message");
         string message = msg ? msg->toString() : "unknown";
-        return new Jua_Str(self->vm, prefix + ": " + message);
+        return new String(self->vm, prefix + ": " + message);
     }));
     return proto;
 }
-Jua_Obj* JuaVM::makeTryResProto(){
-    auto proto = new Jua_Obj(this);
-    proto->setProp("catch", makeFunc([this](jualist& args) -> Jua_Val* {
+Object* VM::makeTryResProto(){
+    auto proto = new Object(this);
+    proto->setProp("catch", makeFunc([this](jualist& args) -> Value* {
         if(args.size() < 2) throw new JuaError("TryRes.catch() requires 2 arguments");
         auto self = args[0], fn = args[1]; //todo: catch(self, ErrorType, fn)
-        if(self->type != Jua_Val::Obj)
+        if(self->type != Value::Obj)
             throw new JuaError("TryRes.catch() called on a non-object");
-        auto res = static_cast<Jua_Obj*>(self);
+        auto res = static_cast<Object*>(self);
         auto status = res->getProp("status");
-        if(!status || status->type != Jua_Val::Bool)
+        if(!status || status->type != Value::Bool)
             throw new JuaError("TryRes.catch() called on an invalid object");
         if(status->toBoolean()){
             return res;
         }
-        if(fn->type != Jua_Val::Func)
+        if(fn->type != Value::Func)
             throw new JuaError("TryRes.catch() requires a function argument");
         auto error = res->getProp("error");
         if(!error)

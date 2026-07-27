@@ -1,30 +1,30 @@
 #include "jua-syntax.h"
 #include "jua-vm.h"
 
-Jua_Val* LiteralStr::calc(Scope* env){
-    return new Jua_Str(env->vm, value);
+Value* LiteralStr::calc(Scope* env){
+    return new String(env->vm, value);
 }
-Jua_Val* Template::calc(Scope* env){
+Value* Template::calc(Scope* env){
     string str = strList[0];
     for(size_t i=0; i<exprList.size(); i++){
         auto val = exprList[i]->calc(env);
         str += val->toString();
         str += strList[i+1];
     }
-    return new Jua_Str(env->vm, str);
+    return new String(env->vm, str);
 }
 LiteralNum* LiteralNum::eval(const string& str){
     return new LiteralNum(std::stod(str));
 }
-Jua_Val* LiteralNum::calc(Scope* env){
-    return new Jua_Num(env->vm, value);
+Value* LiteralNum::calc(Scope* env){
+    return new Number(env->vm, value);
 }
 
-Jua_Val* Keyword::calc(Scope* env){
+Value* Keyword::calc(Scope* env){
     switch (type){
-        case 'n': return Jua_Null::getInst();
-        case 't': return Jua_Bool::getInst(true);
-        case 'f': return Jua_Bool::getInst(false);
+        case 'n': return Null::getInst();
+        case 't': return Boolean::getInst(true);
+        case 'f': return Boolean::getInst(false);
         case 'l': return env;
     }
     throw "Keyword::calc";
@@ -34,7 +34,7 @@ Keyword* Keyword::t = new Keyword('t');
 Keyword* Keyword::f = new Keyword('f');
 Keyword* Keyword::local = new Keyword('l');
 
-Jua_Val* Varname::calc(Scope* env){
+Value* Varname::calc(Scope* env){
     auto val = env->getProp(str);
     if(!val){
         string msg = "Var not declared: ";
@@ -43,10 +43,10 @@ Jua_Val* Varname::calc(Scope* env){
     }
     return val;
 }
-void Varname::assign(Scope* env, Jua_Val* val){
+void Varname::assign(Scope* env, Value* val){
     env->assign(str, val);
 }
-void Varname::declare(Scope* env, Jua_Val* val){
+void Varname::declare(Scope* env, Value* val){
     env->setProp(str, val);
 }
 
@@ -65,16 +65,16 @@ void DeclarationItem::addDefault(){
     if(!initval)initval = Keyword::null;
     body->addDefault();
 }
-void DeclarationItem::assign(Scope* env, Jua_Val* val){
+void DeclarationItem::assign(Scope* env, Value* val){
     if(!val)val = initval->calc(env);
     body->assign(env, val);
 }
-void DeclarationItem::declare(Scope* env, Jua_Val* val){
+void DeclarationItem::declare(Scope* env, Value* val){
     if(!val)val = initval->calc(env);
     body->declare(env, val);
 }
 
-void DeclarationList::assign(Scope *env, Jua_Val *val){
+void DeclarationList::assign(Scope *env, Value *val){
     auto it = val->getIterator();
     for(auto item: decItems){
         auto v = it->next();
@@ -85,7 +85,7 @@ void DeclarationList::assign(Scope *env, Jua_Val *val){
     }
     delete it;
 }
-void DeclarationList::declare(Scope *env, Jua_Val *val){
+void DeclarationList::declare(Scope *env, Value *val){
     auto it = val->getIterator();
     for(auto item: decItems){
         auto v = it->next();
@@ -108,73 +108,73 @@ void DeclarationList::rawDeclare(Scope* env, const jualist& vals){
     }
 }
 
-Jua_Val* OptionalPropRef::_calc(Scope* env){
+Value* OptionalPropRef::_calc(Scope* env){
     return expr->calc(env)->getProp(prop);
 }
-Jua_Val* OptionalPropRef::calc(Scope* env){
+Value* OptionalPropRef::calc(Scope* env){
     auto val = _calc(env);
     if(val)return val;
-    return Jua_Null::getInst();
+    return Null::getInst();
 }
-Jua_Val* PropRef::calc(Scope* env){
+Value* PropRef::calc(Scope* env){
     auto val = _calc(env);
     if(val)return val;
     throw new JuaError(std::format("no property: {}", prop));
 }
-void PropRef::assign(Scope* env, Jua_Val* val){
+void PropRef::assign(Scope* env, Value* val){
     auto tar = expr->calc(env);
-    if(tar->type != Jua_Val::Obj)throw "not an object";
-    auto obj = static_cast<Jua_Obj*>(tar);
+    if(tar->type != Value::Obj)throw "not an object";
+    auto obj = static_cast<Object*>(tar);
     obj->setProp(prop, val);
 }
-Jua_Val* MethWrapper::calc(Scope* env){
+Value* MethWrapper::calc(Scope* env){
     auto obj = expr->calc(env);
     auto meth = obj->getProp(key);
     if(!meth)throw new JuaError(std::format("no method: {}", key));
-    return new Jua_NativeFunc(env->vm, [obj, meth](jualist& args){
+    return new NativeFunction(env->vm, [obj, meth](jualist& args){
         args.push_front(obj);
         return meth->call(args);
     });
 }
-Jua_Val* Subscription::calc(Scope* env){
+Value* Subscription::calc(Scope* env){
     auto obj = expr->calc(env);
     auto key = keyExpr->calc(env);
     return obj->getItem(key);
 }
-void Subscription::assign(Scope* env, Jua_Val* val){
+void Subscription::assign(Scope* env, Value* val){
     auto obj = expr->calc(env);
     auto key = keyExpr->calc(env);
     obj->setItem(key, val);
 }
 
-Jua_Val* Call::calc(Scope* env){
+Value* Call::calc(Scope* env){
     //d_log("Call");
     auto fn = calee->calc(env);
     auto list = args->calc(env);
     return fn->call(list);
 }
 
-Jua_Val* ArrayExpr::calc(Scope* env){
-    auto arr = new Jua_Array(env->vm, {});
+Value* ArrayExpr::calc(Scope* env){
+    auto arr = new Array(env->vm, {});
     list->appendTo(env, arr->items); //避免复制
     return arr;
 }
-Jua_Val* ObjExpr::calc(Scope* env){
-    auto obj = new Jua_Obj(env->vm);
+Value* ObjExpr::calc(Scope* env){
+    auto obj = new Object(env->vm);
     for(auto kv: entries){
         auto key = kv.first->calc(env), val = kv.second->calc(env);
-        if(key->type != Jua_Val::Str)
+        if(key->type != Value::Str)
             throw "non-string key";
         obj->setProp(key->toString(), val);
     }
     return obj;
 }
 
-Jua_Val* UnitaryExpr::calc(Scope* env){
+Value* UnitaryExpr::calc(Scope* env){
     auto val = pri->calc(env);
     return operate(oper, val);
 }
-Jua_Val* BinaryExpr::calc(Scope* env){
+Value* BinaryExpr::calc(Scope* env){
     auto leftVal = left->calc(env);
     switch(oper){
         case BinOper::and_:
@@ -185,19 +185,19 @@ Jua_Val* BinaryExpr::calc(Scope* env){
             return operate(oper, leftVal, right->calc(env));
     }
 }
-Jua_Val* Assignment::calc(Scope* env){
+Value* Assignment::calc(Scope* env){
     auto val = right->calc(env);
     left->assign(env, val);
     return val;
 }
-Jua_Val* OperAssignment::calc(Scope* env){
+Value* OperAssignment::calc(Scope* env){
     auto leftVal = left->calc(env);
     auto rightVal = right->calc(env);
-    Jua_Val* result = operate(type, leftVal, rightVal);
+    Value* result = operate(type, leftVal, rightVal);
     assignee->assign(env, result);
     return result;
 }
-Jua_Val* TernaryExpr::calc(Scope* env){
+Value* TernaryExpr::calc(Scope* env){
     auto cond = condExpr->calc(env);
     if(cond->toBoolean())
         return trueExpr->calc(env);
@@ -212,16 +212,16 @@ void LeftObj::addDefault(){
     }
     auto_nulled = true;
 }
-void LeftObj::assign(Scope* env, Jua_Val* val){
+void LeftObj::assign(Scope* env, Value* val){
     forEach(env, val, DeclarationItem::assign); //& ?
 }
-void LeftObj::declare(Scope* env, Jua_Val* val){
+void LeftObj::declare(Scope* env, Value* val){
     forEach(env, val, DeclarationItem::declare);
 }
-void LeftObj::forEach(Scope *env, Jua_Val *obj, Callback cb){
+void LeftObj::forEach(Scope *env, Value *obj, Callback cb){
     for(auto [keyExpr, decItem]: entries){
         auto key = keyExpr->calc(env);
-        if(key->type != Jua_Val::Str)
+        if(key->type != Value::Str)
             throw new JuaError("non-string key");
         auto val = obj->getProp(key->toString());
         if(val || decItem->initval)
@@ -233,7 +233,7 @@ void LeftObj::forEach(Scope *env, Jua_Val *obj, Callback cb){
 
 
 void Return::exec(Scope* env, Controller* ctrl){
-    ctrl->retval = expr ? expr->calc(env) : Jua_Null::getInst();
+    ctrl->retval = expr ? expr->calc(env) : Null::getInst();
 }
 
 IfStmt::IfStmt(Expr* c, Block* b, Block* e): cond(c), body(b), elseBody(e){
@@ -283,7 +283,7 @@ void WhileStmt::exec(Scope* env, Controller* controller){
 void ForStmt::exec(Scope* env, Controller* controller){
     auto target = iterable->calc(env);
     auto it = target->getIterator(env->vm->obj_next);
-    Jua_Val *value;
+    Value *value;
     while(value = it->next()){
         declarable->declare(env, value);
         body->exec(new Scope(env), controller);
@@ -311,14 +311,14 @@ void Block::exec(Scope* env, Controller* controller){ //env是新产生的作用
         else stmt->exec(env, controller);
     env->gc();
 }
-Jua_Val* FunctionBody::exec(Scope* env){
+Value* FunctionBody::exec(Scope* env){
     auto controller = new Controller;
     Block::exec(env, controller);
     auto retval = controller->retval;
     if(retval)
         controller->retval = nullptr;
     else
-        retval = Jua_Null::getInst();
+        retval = Null::getInst();
     if(controller->isPending())
         throw "isPending";
     delete controller;

@@ -1,15 +1,15 @@
 #include "jua-value.h"
 #include "jua-operators.h"
 #include <format>
-
+namespace Jua {
 struct Expr{
-    virtual Jua_Val* calc(Scope* env) = 0;
+    virtual Value* calc(Scope* env) = 0;
 };
 struct LeftValue{
-    virtual void assign(Scope*, Jua_Val*) = 0;
+    virtual void assign(Scope*, Value*) = 0;
 };
 struct Declarable: LeftValue{
-    virtual void declare(Scope* env, Jua_Val* val) = 0;
+    virtual void declare(Scope* env, Value* val) = 0;
     virtual void addDefault(){}
 };
 struct DeclarationItem{
@@ -17,87 +17,87 @@ struct DeclarationItem{
     Expr* initval;
     DeclarationItem(Declarable* d, Expr* e=nullptr): body(d), initval(e){}
     void addDefault();
-    void assign(Scope* env, Jua_Val* val);
-    void declare(Scope* env, Jua_Val* val);
+    void assign(Scope* env, Value* val);
+    void declare(Scope* env, Value* val);
 };
 struct DeclarationList: Declarable{
     //static DeclarationList* fromNames()
     std::deque<DeclarationItem*> decItems;
     DeclarationList(std::deque<DeclarationItem*> items): decItems(items){}
-    void assign(Scope* env, Jua_Val* val); //仅用于左值数组
-    void declare(Scope* env, Jua_Val* val); //仅用于左值数组
+    void assign(Scope* env, Value* val); //仅用于左值数组
+    void declare(Scope* env, Value* val); //仅用于左值数组
     void rawDeclare(Scope* env, const jualist&);
 };
 struct LiteralNum: Expr{
     double value;
     LiteralNum(double v): value(v){}
-    static LiteralNum* eval(const string& str);
-    Jua_Val* calc(Scope*);
+    static LiteralNum* eval(const std::string& str);
+    Value* calc(Scope*);
 };
 struct LiteralStr: Expr{
-    string value;
-    LiteralStr(string v): value(v){}
-    Jua_Val* calc(Scope*);
+    std::string value;
+    LiteralStr(std::string v): value(v){}
+    Value* calc(Scope*);
 };
 struct Template: Expr{
-    std::vector<string> strList;
+    std::vector<std::string> strList;
     std::vector<Expr*> exprList;
-    Template(std::vector<string>& sl, std::vector<Expr*> el): strList(sl), exprList(el){}
-	Jua_Val* calc(Scope*);
+    Template(std::vector<std::string>& sl, std::vector<Expr*> el): strList(sl), exprList(el){}
+	Value* calc(Scope*);
 };
 struct Keyword: Expr{
     char type;
     Keyword(char t): type(t){};
-    Jua_Val* calc(Scope*);
+    Value* calc(Scope*);
     static Keyword* null;
     static Keyword* t;
     static Keyword* f;
     static Keyword* local;
 };
 struct Varname: Expr, Declarable{
-    string str;
+    std::string str;
     //size_t hash; todo
-    Varname(string name): str(name){};
-    Jua_Val* calc(Scope*);
-    void assign(Scope* env, Jua_Val* val);
-    void declare(Scope* env, Jua_Val* val);
+    Varname(std::string name): str(name){};
+    Value* calc(Scope*);
+    void assign(Scope* env, Value* val);
+    void declare(Scope* env, Value* val);
 };
 struct OptionalPropRef: Expr{
     Expr* expr;
-    string prop;
-	OptionalPropRef(Expr* e, string p): expr(e), prop(p){}
-	Jua_Val* _calc(Scope* env);
-	Jua_Val* calc(Scope* env);
+    std::string prop;
+	OptionalPropRef(Expr* e, std::string p): expr(e), prop(p){}
+	Value* _calc(Scope* env);
+	Value* calc(Scope* env);
 };
 struct PropRef: OptionalPropRef, LeftValue{
     using OptionalPropRef::OptionalPropRef;
-    Jua_Val* calc(Scope* env);
-	void assign(Scope* env, Jua_Val* val);
+    Value* calc(Scope* env);
+	void assign(Scope* env, Value* val);
 };
 struct MethWrapper: Expr{
     Expr* expr;
-    string key;
-    MethWrapper(Expr* e, string n): expr(e), key(n){}
-    Jua_Val* calc(Scope* env);
+    std::string key;
+    MethWrapper(Expr* e, std::string n): expr(e), key(n){}
+    Value* calc(Scope* env);
 };
 struct UnitaryExpr: Expr{
     UniOper oper;
     Expr* pri;
     UnitaryExpr(UniOper type, Expr* expr): oper(type), pri(expr){}
-    Jua_Val* calc(Scope* env);
+    Value* calc(Scope* env);
 };
 struct BinaryExpr: Expr{
     BinOper oper;
     Expr* left;
     Expr* right;
     BinaryExpr(BinOper type, Expr* l, Expr* r): oper(type), left(l), right(r) {}
-	Jua_Val* calc(Scope* env);
+	Value* calc(Scope* env);
 };
 struct Assignment: Expr{
     LeftValue* left;
     Expr* right;
     Assignment(LeftValue* l, Expr* r): left(l), right(r){}
-    Jua_Val* calc(Scope* env);
+    Value* calc(Scope* env);
 };
 struct OperAssignment: Expr{
     BinOper type;
@@ -109,29 +109,29 @@ struct OperAssignment: Expr{
         if(!assignee)
             throw "Cannot assign to non-leftvalue";
     }
-    Jua_Val* calc(Scope* env);
+    Value* calc(Scope* env);
 };
 struct Subscription: Expr, LeftValue{
     Expr* expr;
     Expr* keyExpr;
 	Subscription(Expr* e, Expr* k): expr(e), keyExpr(k){}
-	Jua_Val* calc(Scope* env);
-	void assign(Scope* env, Jua_Val* val);
+	Value* calc(Scope* env);
+	void assign(Scope* env, Value* val);
 };
 struct TernaryExpr: Expr{
     Expr* condExpr;
     Expr* trueExpr;
     Expr* falseExpr;
     TernaryExpr(Expr* c, Expr* t, Expr* f): condExpr(c), trueExpr(t), falseExpr(f){}
-    Jua_Val* calc(Scope*);
+    Value* calc(Scope*);
 };
 struct FlexibleList{
     std::vector<Expr*> exprs;
     FlexibleList(std::vector<Expr*>& list): exprs(list){};
-    FlexibleList(initializer_list<Expr*> list): exprs(list){};
+    FlexibleList(std::initializer_list<Expr*> list): exprs(list){};
     jualist calc(Scope*);
     void appendTo(Scope*, jualist&);
-    bool contains(Scope* env, Jua_Val* val){
+    bool contains(Scope* env, Value* val){
         for(auto expr: exprs){
             if(*expr->calc(env) == val) return true;
         }
@@ -142,37 +142,37 @@ struct Call: Expr{
     Expr* calee;
     FlexibleList* args;
     Call(Expr* e, FlexibleList* l): calee(e), args(l){}
-    Jua_Val* calc(Scope*);
+    Value* calc(Scope*);
 };
 
 struct ObjExpr: Expr{
     typedef std::vector<std::pair<Expr*, Expr*>> Props;
     Props entries;
 	ObjExpr(Props p): entries(p){}
-	Jua_Val* calc(Scope*);
+	Value* calc(Scope*);
 };
 struct ArrayExpr: Expr{
     FlexibleList* list;
     ArrayExpr(FlexibleList* exprs): list(exprs){}
-	Jua_Val* calc(Scope*);
+	Value* calc(Scope*);
 };
 struct LeftObj: Declarable{
     bool auto_nulled = false;
     typedef std::vector<std::pair<Expr*, DeclarationItem*>> Entries;
     Entries entries;
     LeftObj(Entries e): entries(e){}
-    void assign(Scope*, Jua_Val*);
-    void declare(Scope* env, Jua_Val* val);
+    void assign(Scope*, Value*);
+    void declare(Scope* env, Value* val);
     void addDefault();
     private:
-    typedef void (DeclarationItem::*Callback)(Scope*, Jua_Val*);
-    void forEach(Scope* env, Jua_Val* obj, Callback);
+    typedef void (DeclarationItem::*Callback)(Scope*, Value*);
+    void forEach(Scope* env, Value* obj, Callback);
 };
 
 struct Controller{
     bool breaking = false;
     bool continuing = false;
-    Jua_Val* retval = nullptr;
+    Value* retval = nullptr;
     bool isPending() {
         return breaking || continuing || retval;
     }
@@ -275,16 +275,16 @@ struct FunctionBody: Block{
         if(pending_break)
             throw pending_break;
     }
-    Jua_Val* exec(Scope*); //不会返回 nullptr
+    Value* exec(Scope*); //不会返回 nullptr
 };
 
-struct Jua_PFunc: Jua_Func{
+struct Jua_PFunc: Function{
     Scope* upenv;
     DeclarationList* decList;
     FunctionBody* body;
     Jua_PFunc(Scope* env, DeclarationList* list, FunctionBody* b):
-        Jua_Func(env->vm), upenv(env), decList(list), body(b){}
-	Jua_Val* call(jualist& args){
+        Function(env->vm), upenv(env), decList(list), body(b){}
+	Value* call(jualist& args){
 		auto env = new Scope(upenv);
 		decList->rawDeclare(env, args);
 		return body->exec(env);
@@ -296,7 +296,7 @@ struct FunExpr: Expr{
     FunctionBody* body;
 	FunExpr(DeclarationList* dl, Stmts stmts):
         decList(dl), body(new FunctionBody(stmts)){}
-	Jua_Val* calc(Scope* env){
+	Value* calc(Scope* env){
 		return new Jua_PFunc(env, decList, body);
 	}
 };
@@ -305,12 +305,14 @@ struct JuaSyntaxError: JuaError{
     size_t pos = -1;
     size_t line = -1;
     size_t col = -1;
-    JuaSyntaxError(const string& msg, size_t p, size_t l, size_t c):
+    JuaSyntaxError(const std::string& msg, size_t p, size_t l, size_t c):
         JuaError(msg), pos(p), line(l), col(c){}
-    string toDebugString() override {
+    std::string toDebugString() override {
         if(pos == -1) return std::format("JuaSyntaxError: {}", message);
         return std::format("JuaSyntaxError: {} at {}:{}", message, line, col);
     }
 };
 
-FunctionBody* parse(const string&);
+FunctionBody* parse(const std::string&);
+
+}

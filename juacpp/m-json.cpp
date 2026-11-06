@@ -73,7 +73,7 @@ string encode(Value* val){
 
 Value* decode(VM* vm, const string& str, size_t& pos);
 String* decode_string(VM* vm, const string& str, size_t& pos){
-    //从'"'开始解析
+    //从'"'开始解析，返回时 pos 指向闭合引号之后
     pos++;
     size_t start = pos;
     string result;
@@ -82,44 +82,53 @@ String* decode_string(VM* vm, const string& str, size_t& pos){
         if(c == '\"'){
             pos++;
             return new String(vm, result);
-        }else if(c == '\\'){
+        }
+        if(c != '\\'){
+            //普通字符：这是原先缺失的分支，没有它就会原地死循环
+            result += c;
             pos++;
-            if(pos >= str.size()){
-                throw new InvalidJSONException("Unterminated string starting at position " + std::to_string(start-1));
-            }
-            char esc = str[pos];
-            switch(esc){
-                case '\"': result += '\"'; break;
-                case '\\': result += '\\'; break;
-                case '/': result += '/'; break;
-                case 'b': result += '\b'; break;
-                case 'f': result += '\f'; break;
-                case 'n': result += '\n'; break;
-                case 'r': result += '\r'; break;
-                case 't': result += '\t'; break;
-                case 'u': {
-                    if(pos + 4 >= str.size()){
-                        throw new InvalidJSONException("Invalid unicode escape at position " + std::to_string(pos));
-                    }
-                    string hex = str.substr(pos + 1, 4);
-                    char* endptr;
-                    long codepoint = strtol(hex.c_str(), &endptr, 16);
-                    if(*endptr != '\0' || codepoint < 0 || codepoint > 0xFFFF){
-                        throw new InvalidJSONException("Invalid unicode escape at position " + std::to_string(pos));
-                    }
-                    //简单处理BMP字符
-                    if(codepoint <= 0x7F){
-                        result += static_cast<char>(codepoint);
-                    }else if(codepoint <= 0x7FF){
-                        result += static_cast<char>(0xC0 | ((codepoint >> 6) & 0x1F));
-                        result += static_cast<char>(0x80 | (codepoint & 0x3F));
-                    }else{
-                        result += static_cast<char>(0xE0 | ((codepoint >> 12) & 0x0F));
-                        result += static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F));
-                        result += static_cast<char>(0x80 | (codepoint & 0x3F));
-                    }
+            continue;
+        }
+        pos++; //跳过反斜杠
+        if(pos >= str.size()){
+            throw new InvalidJSONException("Unterminated string starting at position " + std::to_string(start-1));
+        }
+        char esc = str[pos++];
+        switch(esc){
+            case '\"': result += '\"'; break;
+            case '\\': result += '\\'; break;
+            case '/': result += '/'; break;
+            case 'b': result += '\b'; break;
+            case 'f': result += '\f'; break;
+            case 'n': result += '\n'; break;
+            case 'r': result += '\r'; break;
+            case 't': result += '\t'; break;
+            case 'u': {
+                if(pos + 4 > str.size()){
+                    throw new InvalidJSONException("Invalid unicode escape at position " + std::to_string(pos));
                 }
+                string hex = str.substr(pos, 4);
+                char* endptr;
+                long codepoint = strtol(hex.c_str(), &endptr, 16);
+                if(*endptr != '\0' || codepoint < 0 || codepoint > 0xFFFF){
+                    throw new InvalidJSONException("Invalid unicode escape at position " + std::to_string(pos));
+                }
+                pos += 4;
+                //简单处理BMP字符
+                if(codepoint <= 0x7F){
+                    result += static_cast<char>(codepoint);
+                }else if(codepoint <= 0x7FF){
+                    result += static_cast<char>(0xC0 | ((codepoint >> 6) & 0x1F));
+                    result += static_cast<char>(0x80 | (codepoint & 0x3F));
+                }else{
+                    result += static_cast<char>(0xE0 | ((codepoint >> 12) & 0x0F));
+                    result += static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F));
+                    result += static_cast<char>(0x80 | (codepoint & 0x3F));
+                }
+                break;
             }
+            default:
+                throw new InvalidJSONException("Unknown escape at position " + std::to_string(pos-1));
         }
     }
     throw new InvalidJSONException("Unterminated string starting at position " + std::to_string(start-1));

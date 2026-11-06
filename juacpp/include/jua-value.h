@@ -1,5 +1,6 @@
 #pragma once
-#define JUA_DEBUG
+// 定义 JUA_DEBUG 后 d_log 会向 stdout 打印调试信息（默认关闭）
+//#define JUA_DEBUG
 #include <string>
 #include <deque>
 #include <vector>
@@ -8,6 +9,7 @@
 #include <cstddef>
 #include <cmath>
 #include <functional>
+#include <utility>
 static_assert(
     sizeof(char)==1 &&
     sizeof(float)==4 &&
@@ -30,13 +32,17 @@ void d_log(Value*);
 void d_log(std::string, Value*);
 void d_log(std::string, int);
 
+// 值。所有值都由 new 分配，由 VM 的标记-清除回收（见 gc.cpp）。
+// 不参与回收的值（Null / Boolean 单例）的 vm 为 nullptr。
 struct Value{
     VM* vm = nullptr; //指向JuaVM实例
     enum JuaType{Obj, Null, Str, Num, Bool, Func};
     JuaType type;
-    size_t id = -1;
+    size_t id = (size_t)-1;
     Object* proto;
-    Value(VM* vm_, JuaType t, Object* p = nullptr): vm(vm_), type(t), proto(p){}
+    bool marked = false; //GC 标记位
+    Value(VM* vm_, JuaType t, Object* p = nullptr);
+    virtual ~Value() = default;
     virtual bool isType(int type_id){
         //用于自定义类型判断（自定义类型应当是 Object 的子类）
         //保留的 type_id:
@@ -48,6 +54,8 @@ struct Value{
         // 5-15: 未使用
         return false;
     }
+    //把本值持有的所有强引用交给 GC。只在标记阶段调用。
+    virtual void trace(VM* vm){}
     virtual Value* getOwn(const std::string& key){
         return nullptr;
     }
@@ -88,6 +96,7 @@ struct Value{
     virtual JuaIterator* getIterator(Function* next=nullptr); //优先使用元方法 "next"
     virtual void collectItems(jualist&); //仅用于可迭代对象
     virtual bool operator==(Value* val);
+    virtual bool isInst(Value* klass); //用于 is 运算符：判断原型/父类链
     virtual std::string toString() = 0; //const std::string& str = toString()
     virtual std::string safeToString(){ return toString(); }
     virtual bool toBoolean(){ return true; }
@@ -95,14 +104,12 @@ struct Value{
     virtual int64_t toInt(); //仅用于数字
     virtual double toNumber(); //仅用于数字
     virtual std::string getTypeName() = 0;
-    virtual void gc();
 };
 
 struct Null: Value{
     std::string toString(){ return "null"; }
     bool toBoolean(){ return false; }
     std::string getTypeName(){ return "null"; }
-    void gc(){}
     static Null* getInst(){
         static Null* inst = new Null;
         return inst;
@@ -113,7 +120,6 @@ struct Null: Value{
 struct Object: Value{
     std::unordered_map<std::string, Value*> dict;
     Object(VM* vm_, Object* p = nullptr);
-    ~Object();
     bool hasOwn(Value* key);
     Value* getOwn(size_t hash, const std::string& key); //todo
     Value* getOwn(const std::string& key){
@@ -131,6 +137,7 @@ struct Object: Value{
     void setItem(Value* key, Value* val);
     bool isPropTrue(const char* key);
     void assignProps(Object* obj);
+    void trace(VM* vm) override;
     std::string toString();
     std::string safeToString(); //不调用元方法
     std::string getTypeName(){ return "object"; }
@@ -142,7 +149,6 @@ struct Boolean: Value{
     }
     bool toBoolean(){ return value; }
     std::string getTypeName(){ return "boolean"; }
-    void gc(){}
     static Boolean* getInst(bool v){
         static Boolean* t = new Boolean(true);
         static Boolean* f = new Boolean(false);
@@ -165,7 +171,7 @@ struct Number: Value{
     bool operator==(Value* val);
     std::string toString();
     bool toBoolean(){ return value; }
-    int64_t toInt(){ return std::round(value); }
+    int64_t toInt(){ return std::llround(value); }
     double toNumber(){ return value; }
     std::string getTypeName(){ return "number"; }
 };
@@ -178,10 +184,10 @@ struct String: Value{
     bool operator==(Value *);
     std::string toString(){ return value; }
     bool toBoolean(){ return value.size(); }
-    std::string getTypeName(){ return "std::string"; }
+    std::string getTypeName(){ return "string"; }
 };
 struct Function: Value{
-    Function(VM* vm_): Value(vm_, Func){}
+    Function(VM* vm_);
     std::string toString(){ return "<function>"; }
     std::string getTypeName(){ return "function"; }
 };
@@ -195,6 +201,7 @@ struct Scope: Object{
         return type_id == Scope::type_id;
     }
     Value* inheritProp(const std::string&) override;
+    void trace(VM* vm) override;
     void assign(const std::string& key, Value* val){
         for(auto scope = this; scope; scope = scope->parent){
             if(scope->dict.contains(key)){
@@ -208,12 +215,13 @@ struct Scope: Object{
 struct NativeFunction: Function{
     typedef std::function<Value*(jualist&)> Native; //可返回 nullptr
     Native native;
+    //原生函数捕获的 jua 值。GC 必须能看到它们，否则 obj:meth 逃逸后接收者会被回收。
+    std::vector<Value*> captures;
     NativeFunction(VM* vm_, Native fn): Function(vm_), native(fn){}
-    Value* call(jualist& args){
-        auto res = native(args);
-        if(res)return res;
-        return Null::getInst();
-    }
+    NativeFunction(VM* vm_, Native fn, std::vector<Value*> caps):
+        Function(vm_), native(fn), captures(std::move(caps)){}
+    Value* call(jualist& args); //在 value.cpp 中实现：需要把实参登记为 GC 根
+    void trace(VM* vm) override;
 };
 struct Array: Object{
     static const int type_id = 2;
@@ -230,16 +238,17 @@ struct Array: Object{
             list.push_back(item);
         }
     }
+    void trace(VM* vm) override;
 };
 struct Buffer: Object{
     static const int type_id = 3;
     uint8_t* bytes;
     size_t length;
-    bool shared = false;
-    Buffer(VM*, uint8_t*, size_t, bool shared=true);
+    bool owned = false; //是否拥有 bytes 的内存
+    Buffer(VM*, uint8_t*, size_t, bool owned=false);
     Buffer(VM*, size_t);
     ~Buffer(){
-        if(!shared) delete bytes;
+        if(owned && bytes) delete[] bytes;
     }
     bool isType(int type_id) override {
         return type_id == Buffer::type_id;
@@ -262,12 +271,16 @@ struct Coroutine: Object{ //抽象类
 };
 
 struct JuaIterator{
+    virtual ~JuaIterator() = default;
     virtual Value* next() = 0; //迭代完成时返回 nullptr
+    //把自己当前持有的值登记进 GC 根集合（在 next() 之前调用）
+    virtual void rootValues(VM* vm){}
 };
 struct JuaError{
     std::string message;
     JuaError(std::string msg): message(msg){}
     JuaError(): JuaError("Unknown JuaError"){}
+    virtual ~JuaError() = default;
     virtual std::string toDebugString();
 };
 struct JuaErrorWithVal: JuaError{
@@ -286,3 +299,7 @@ struct JuaTypeError: JuaError{
 };
 
 }
+
+// 本仓库的各实现文件假定这些名字在全局作用域可见。
+using namespace Jua;
+using std::string;

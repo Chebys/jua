@@ -1,6 +1,7 @@
 #pragma once
 #include<string>
 #include <cstdint>
+#include <cstring>
 
 template<typename T>
 std::string encode(double num){
@@ -19,7 +20,7 @@ double decode(const std::string& str){
     return value;
 }
 
-bool isLittleEndian(){
+inline bool isLittleEndian(){
     uint16_t num = 0x0102;
     return *(uint8_t*)&num == 0x02; // 如果低位在前，则为小端
 }

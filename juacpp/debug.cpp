@@ -2,6 +2,8 @@
 #include <iostream>
 #include <format>
 
+namespace Jua {
+
 void d_log(const string& msg){
     #ifdef JUA_DEBUG
     std::cout << msg << '\n';
@@ -23,4 +25,6 @@ void d_log(string label, int num){
     label.append(": ");
     label.append(std::to_string(num));
     d_log(label);
+}
+
 }

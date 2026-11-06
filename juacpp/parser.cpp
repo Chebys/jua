@@ -208,7 +208,14 @@ struct ScriptReader: TokensReader{
     size_t line = 1;
     size_t col = 0;
     Token* cache = nullptr;
-    ScriptReader(const string& s): script(s){}
+    ScriptReader(const string& s): script(s){
+        //跳过 UTF-8 BOM：不少 Windows 编辑器默认写入，否则首个字节会被当作未知字符
+        if(script.size() >= 3
+           && (unsigned char)script[0] == 0xEF
+           && (unsigned char)script[1] == 0xBB
+           && (unsigned char)script[2] == 0xBF)
+            pos = 3;
+    }
     Token* read();
     Token* preview();
     private:
@@ -601,7 +608,7 @@ Expr* parsePrimary(TokensReader& reader){
                 cl->reader.assetEnd();
             }
         }
-        return new Template(dqstr->strList, exprs);
+        return parsePrimaryTail(new Template(dqstr->strList, exprs), reader);
     }
     case Token::PAREN:{
         auto cl = static_cast<Enclosure*>(start);
@@ -696,13 +703,17 @@ Expr* parsePrimaryTail(Expr* start, TokensReader& reader){
             return parsePrimaryTail(call, reader);
         }
         case Token::STR:{
-            reader.read();
-            auto str = new LiteralStr(next->str);
-            auto call = new Call(start, new FlexibleList({str}));
+            //尾随字符串实参：实参是“以该字面字符串开头的整个表达式”，
+            //而不是只有那个字面量。否则 throw 'a' + b 会被解析成 (throw 'a') + b。
+            auto expr = parseExpr(reader);
+            auto call = new Call(start, new FlexibleList({expr}));
             return parsePrimaryTail(call, reader);
         }
         case Token::DQ_STR:{
-            throw "todo: print \"$expr\"";
+            //同上，适用于字符串模板：print "$x" / throw "bad: $why"
+            auto expr = parseExpr(reader);
+            auto call = new Call(start, new FlexibleList({expr}));
+            return parsePrimaryTail(call, reader);
         }
         default:
             return start;
@@ -1004,10 +1015,12 @@ Block* parseBlockOrStatement(TokensReader& reader){
     }
 }
 
+namespace Jua {
 FunctionBody* parse(const string& script){
     //d_log("Parsing script:");
     //d_log(script);
     ScriptReader reader(script);
     auto stmts = parseStatements(reader);
     return new FunctionBody(stmts);
+}
 }

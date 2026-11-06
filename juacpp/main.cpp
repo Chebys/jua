@@ -19,6 +19,20 @@ struct JuaRuntime: VM{
     JuaRuntime(const char* name, fs::path _cwd=fs::current_path()): main(name), cwd(_cwd){
         auto api = new Object(this);
         api->setProp("version", new String(this, "JuaRuntime 0.1"));
+        //GC 诊断接口（宿主 API，不属于语言）
+        api->setProp("collect", makeFunc([this](jualist& args){
+            return new Number(this, (double)collect());
+        }));
+        api->setProp("liveValues", makeFunc([this](jualist& args){
+            return new Number(this, (double)liveCount());
+        }));
+        api->setProp("gcStats", makeFunc([this](jualist& args){
+            auto stats = new Object(this);
+            stats->setProp("collections", new Number(this, (double)collectedCount));
+            stats->setProp("freed", new Number(this, (double)freedCount));
+            stats->setProp("live", new Number(this, (double)liveCount()));
+            return stats;
+        }));
         api->setProp("alert", makeFunc([this](jualist& args){
             if(args.size() < 1) throw new JuaError("api.alert() requires at least 1 argument");
             auto msg = args[0];
@@ -136,8 +150,7 @@ int main(int argc, char* argv[]){
             if (input.empty()) continue;
             if (input == "exit;") break;
             try{
-                auto val = rt.eval(input);
-                val->gc();
+                rt.eval(input);
             }catch(JuaError* e){
                 rt.j_stderr(e);
             }

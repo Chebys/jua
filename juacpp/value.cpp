@@ -1,6 +1,8 @@
 #include "jua-value.h"
 #include <charconv>
 #include <format>
+#include <cstring>
+#include <algorithm>
 #include "jua-vm.h"
 using namespace Jua;
 
@@ -13,6 +15,7 @@ struct ListIterator: JuaIterator{
         if(index >= list.size())return nullptr;
         return list[index++];
     }
+    // list 属于某个 Array，由调用者（ForStmt）负责把该 Array 登记为根
 };
 struct CustomIterator: JuaIterator{
     Value* obj;
@@ -23,6 +26,10 @@ struct CustomIterator: JuaIterator{
         nextFn = obj->getMetaMethod("next");
         if(!nextFn)
             throw new JuaTypeError("Object is not iterable");
+    }
+    void rootValues(VM* vm){
+        vm->gcRoots.push_back(obj);
+        vm->gcRoots.push_back(key);
     }
     Value* next(){
         auto res = nextFn->call({obj, key});
@@ -37,12 +44,47 @@ struct CustomIterator: JuaIterator{
         auto value = res->getProp("value");
         if(!value)
             throw new JuaTypeError("iterator.next() must return an object with a 'value' property when done is false");
-        key = res->getProp("key");
-        if(!key)
-            throw new JuaTypeError("iterator.next() must return an object with a 'key' property when done is false");
+        // key 是可选的（见 draft/抽象操作.md 的 {done, value?, key?}）。
+        // 有状态的迭代器可以自己保存进度，此时不必返回 key。
+        auto k = res->getProp("key");
+        if(k)key = k;
         return value;
     }
 };
+
+// ---- 构造与 GC 钩子 ----
+
+Value::Value(VM* vm_, JuaType t, Object* p): vm(vm_), type(t), proto(p){
+    if(vm)vm->registerValue(this);
+}
+Function::Function(VM* vm_): Value(vm_, Func, vm_->FunctionProto){}
+
+void Object::trace(VM* vm){
+    vm->markFrom(proto);
+    for(auto& pair: dict)vm->markFrom(pair.second);
+}
+void Scope::trace(VM* vm){
+    // parent 与 proto 指向同一个父作用域，markFrom 幂等，无需去重
+    vm->markFrom(parent);
+    vm->markFrom(proto);
+    for(auto& pair: dict)vm->markFrom(pair.second);
+}
+void Array::trace(VM* vm){
+    vm->markFrom(proto);
+    for(auto& item: items)vm->markFrom(item);
+}
+void NativeFunction::trace(VM* vm){
+    vm->markFrom(proto);
+    for(auto v: captures)vm->markFrom(v);
+}
+Value* NativeFunction::call(jualist& args){
+    //实参表只存在于 C++ 栈上，原生函数体里可能间接调到 jua 函数并触发回收
+    RootGuard guard(vm);
+    for(auto a: args)vm->gcRoots.push_back(a);
+    auto res = native(args);
+    if(res)return res;
+    return Null::getInst();
+}
 
 Value* Value::inheritProp(const string& key){
     if(!proto)return nullptr;
@@ -85,7 +127,6 @@ Value* Value::call(jualist& args){
     if(!fn)throw new JuaTypeError("Object is not callable");
     args.push_front(this);
     return fn->call(args);
-    
 }
 Value* Value::unm(){
     Function* fn = getMetaMethod("__unm");
@@ -126,7 +167,7 @@ Boolean* Value::le(Value* val){
     throw new JuaTypeError("Object is not comparable");
 }
 Value* Value::range(Value* val){
-    Function* fn = getMetaMethod("range");
+    Function* fn = getMetaMethod("__range");
     if(fn)return fn->call({this, val});
     throw new JuaTypeError("Object is not rangeable");
 }
@@ -134,6 +175,16 @@ bool Value::operator==(Value* val){
     Function* fn = getMetaMethod("__eq");
     if(fn)return fn->call({this, val})->toBoolean();
     return this == val;
+}
+bool Value::isInst(Value* klass){
+    //自身原型就是该类，或沿 super 链能找到该类
+    for(Object* p = proto; p; ){
+        if(p == klass)return true;
+        auto super = p->getOwn("super");
+        if(!super || super->type != Value::Obj)return false;
+        p = static_cast<Object*>(super);
+    }
+    return false;
 }
 Boolean* Value::toJuaBool(){
     return Boolean::getInst(toBoolean());
@@ -162,32 +213,16 @@ void Value::collectItems(jualist& list){
     delete it;
 }
 
-void Value::gc(){
-    //todo
-    if(!ref){
-        //d_log("gc()");
-        //delete this;
-    }
-}
-
-Object::Object(VM* vm_, Object* p): Value(vm_, Obj, p){ if(p)p->addRef(); }
-Object::~Object(){ if(proto)proto->release(); }
+Object::Object(VM* vm_, Object* p): Value(vm_, Obj, p){}
 bool Object::hasOwn(Value* key){
     if(key->type != Str)throw new JuaError("non-string key");
     return dict.contains(key->toString());
 }
 void Object::setProp(const string& key, Value* val){
-    if(dict.contains(key)){
-        dict[key]->release();
-    }
     dict[key] = val;
-    val->addRef();
 }
 void Object::delProp(const string& key){
-    if(dict.contains(key)){
-        dict[key]->release();
-        dict.erase(key);
-    }
+    dict.erase(key);
 }
 Boolean* Object::hasItem(Value* key){
     auto fn = getMetaMethod("hasItem");
@@ -237,7 +272,8 @@ string Object::safeToString(){
     return str;
 }
 bool Object::isPropTrue(const char* key){
-    return getProp(key) == Boolean::getInst(true);
+    //规范要求“严格属性访问”，即只看自身属性
+    return getOwn(key) == Boolean::getInst(true);
 }
 
 Number::Number(VM* vm, double v): Value(vm, Num, vm->NumberProto), value(v){}
@@ -289,13 +325,16 @@ bool Number::operator==(Value* val){
     return value == static_cast<Number*>(val)->value;
 }
 string Number::toString(){
-    char s[32];
-    auto res = std::to_chars(s, s+32, value);
+    char s[64];
+    auto res = std::to_chars(s, s+64, value);
     return {s, res.ptr};
 }
 
 size_t correctIndex(Value* num, size_t len){
-    return num->toInt() % len;
+    if(!len)throw new JuaError("index on empty value");
+    int64_t i = num->toInt() % (int64_t)len;
+    if(i < 0)i += (int64_t)len;
+    return (size_t)i;
 }
 
 String::String(VM* vm, const string& v): Value(vm, Str, vm->StringProto), value(v){}
@@ -305,7 +344,7 @@ Boolean* String::hasItem(Value* val){
 }
 Value* String::getItem(Value* key){
     size_t i = correctIndex(key, value.length());
-    return new String(vm, {value[i]});
+    return new String(vm, string(1, value[i]));
 }
 Value* String::add(Value* val){
     if(val->type!=Str)throw new JuaTypeError("try to add non-string");
@@ -319,7 +358,7 @@ bool String::operator==(Value* val){
 }
 
 Value* Scope::inheritProp(const string& key){
-    if(parent)return parent->getProp(key); //指针可能已经失效？？？
+    if(parent)return parent->getProp(key); //父作用域由 trace() 保活
     return nullptr;
 }
 
@@ -336,42 +375,58 @@ JuaIterator* Array::getIterator(Function* next){
     return new ListIterator(items);
 }
 
-Buffer::Buffer(VM* vm, size_t len):Object(vm, vm->BufferProto), length(len){
-    bytes = new uint8_t[len];
+Buffer::Buffer(VM* vm, size_t len):Object(vm, vm->BufferProto), length(len), owned(true){
+    bytes = new uint8_t[len ? len : 1]();
+    setProp("length", new Number(vm, (double)len));
 }
-Buffer::Buffer(VM* vm, uint8_t* data, size_t len, bool shared):
-    Object(vm, vm->BufferProto), bytes(data), length(len), shared(shared){}
+Buffer::Buffer(VM* vm, uint8_t* data, size_t len, bool owned):
+    Object(vm, vm->BufferProto), bytes(data), length(len), owned(owned){
+    setProp("length", new Number(vm, (double)len));
+}
 Value* Buffer::getItem(Value* key){
     size_t i = correctIndex(key, length);
     return new Number(vm, bytes[i]);
 }
 void Buffer::setItem(Value* key, Value* val){
     size_t i = correctIndex(key, length);
-    bytes[i] = val->toInt();
+    bytes[i] = (uint8_t)val->toInt();
 }
 Value* Buffer::read(Value* _start, Value* _end){
-    size_t start = _start ? correctIndex(_start, length) : 0;
-    size_t end = _end ? correctIndex(_end, length) : length;
-    if(start>=end)throw "range error";
-    size_t len = end-start;
+    //注意：start/end 是“边界”，应当钳制而不是像下标那样取模回绕
+    int64_t len = (int64_t)length;
+    auto clamp = [len](Value* v, int64_t dflt) -> int64_t {
+        if(!v)return dflt;
+        int64_t i = v->toInt();
+        if(i < 0)i += len;
+        if(i < 0)i = 0;
+        if(i > len)i = len;
+        return i;
+    };
+    int64_t start = clamp(_start, 0);
+    int64_t end = clamp(_end, len);
+    if(start>=end)throw new JuaError("Buffer.read: invalid range");
+    size_t n = (size_t)(end-start);
     auto str = new String(vm);
-    str->value.resize(len);
-    memcpy(&str->value[0], bytes+start, len);
+    str->value.resize(n);
+    if(n)memcpy(&str->value[0], bytes+start, n);
     return str;
 }
 void Buffer::write(Value* _str, Value* _pos){
     if(!_str || _str->type!=Str)
         throw new JuaTypeError("value must be a string");
     std::string& str = static_cast<String*>(_str)->value;
-    size_t pos = _pos ? correctIndex(_pos, length) : 0;
-    size_t len = str.size();
-    if(pos+len > length)
-        throw "out of range";
-    memcpy(bytes+pos, &str[0], len);
+    int64_t pos = 0;
+    if(_pos){
+        pos = _pos->toInt();
+        if(pos < 0)pos += (int64_t)length;
+        if(pos < 0)pos = 0;
+    }
+    if(pos + (int64_t)str.size() > (int64_t)length)
+        throw new JuaError("Buffer.write: out of range");
+    if(str.size())memcpy(bytes+pos, str.data(), str.size());
 }
 
 string JuaError::toDebugString(){
     if(!message.size())return "JuaError";
     return std::format("JuaError: {}", message);
 }
-

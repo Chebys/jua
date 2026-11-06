@@ -89,7 +89,8 @@ inline Value* operate(BinOper type, Value* left, Value* right){
         case BinOper::eq: return left->eq(right);
         case BinOper::ne: return Boolean::getInst(!(*left == right));
         case BinOper::in: return right->hasItem(left);
+        case BinOper::is: return Boolean::getInst(left->isInst(right));
     }
     d_log(int(type));
-    throw "todo: BinOper";
+    throw new JuaError("unimplemented binary operator");
 }

@@ -14,8 +14,7 @@ VM::VM(){
 
 void VM::run(const string& script){
     try{
-        auto val = eval(script);
-        val->gc();
+        eval(script);
     }catch(JuaError* e){
         j_stderr(e);
     }
@@ -84,13 +83,14 @@ void VM::initBuiltins(){
     });
     classProto = new Object(this); //标准可构造类的原型，首先初始化
     classProto->setProp("__class", Boolean::getInst(true));
+    //FunctionProto 必须尽早建立：此后创建的每个函数才会带上原型
+    FunctionProto = makeFunctionProto();
     classProto->setProp("__call", obj_new);
 
     RangeProto = makeRangeProto(); //必须在 NumberProto 之前
     NumberProto = makeNumberProto();
     StringProto = makeStringProto();
     BooleanProto = new Object(this);
-    FunctionProto = makeFunctionProto();
     ObjectProto = makeObjectProto();
 
     ArrayProto = makeArrayProto();
@@ -197,7 +197,7 @@ Object* VM::makeRangeProto(){
         double end = args[2]->toNumber();
         double step = 1;
         if(args.size() >= 4){
-            step = args[4]->toNumber();
+            step = args[3]->toNumber();
         }
         obj->setProp("start", new Number(self->vm, start));
         obj->setProp("end", new Number(self->vm, end));
@@ -376,6 +376,31 @@ Object* VM::makeStringProto(){
             upperStr.push_back(std::toupper(c));
         }
         return new String(self->vm, upperStr);
+    }));
+    proto->setProp("hasItem", makeFunc([](jualist& args){
+        if(args.size() < 2)throw new JuaError("String.hasItem() requires 2 arguments");
+        return args[0]->hasItem(args[1]);
+    }));
+    proto->setProp("getItem", makeFunc([](jualist& args){
+        if(args.size() < 2)throw new JuaError("String.getItem() requires 2 arguments");
+        if(args[0]->type != Value::Str)throw new JuaError("String.getItem() called on non-string value");
+        return args[0]->getItem(args[1]);
+    }));
+    proto->setProp("slice", makeFunc([](jualist& args){
+        if(!args.size())throw new JuaError("String.slice() requires at least 1 argument");
+        auto self = args[0];
+        if(self->type != Value::Str)throw new JuaError("String.slice() called on non-string value");
+        const string& str = static_cast<String*>(self)->value;
+        int64_t len = (int64_t)str.size();
+        int64_t start = args.size() >= 2 ? args[1]->toInt() : 0;
+        int64_t end = args.size() >= 3 ? args[2]->toInt() : len;
+        //负数表示从末尾算起
+        if(start < 0)start += len;
+        if(end < 0)end += len;
+        if(start < 0)start = 0;
+        if(end > len)end = len;
+        if(start >= end)return new String(self->vm, "");
+        return new String(self->vm, str.substr((size_t)start, (size_t)(end-start)));
     }));
     return proto;
 }

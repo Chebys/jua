@@ -1,3 +1,4 @@
+#pragma once
 #include "jua-value.h"
 #include "jua-operators.h"
 #include <format>
@@ -284,6 +285,7 @@ struct Jua_PFunc: Function{
     FunctionBody* body;
     Jua_PFunc(Scope* env, DeclarationList* list, FunctionBody* b):
         Function(env->vm), upenv(env), decList(list), body(b){}
+    void trace(VM* vm) override; //标记定义作用域，闭包因此保活
 	Value* call(jualist& args){
 		auto env = new Scope(upenv);
 		decList->rawDeclare(env, args);

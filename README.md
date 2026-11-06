@@ -30,9 +30,15 @@ Jua 的官方实现是 [juacpp](juacpp)，目前可构建、可运行，但语�
 
 ```powershell
 cd juacpp
-pwsh ./build.ps1          # -> ../build/jua.exe   CLI 宿主：跑一个模块，退出码 0/1
-pwsh ./build.ps1 -Repl    # -> ../build/repl.exe  REPL 宿主
+pwsh ./build.ps1          # -> ../build/jua.exe，只有一个宿主
 pwsh ./run-tests.ps1      # 跑全部工程测试，打印 PASS/FAIL 汇总
+```
+
+`jua.exe` 一个二进制干两件事：
+
+```powershell
+../build/jua.exe           # 无参数：REPL（分号结束一条输入）
+../build/jua.exe <module>  # 跑一个模块，退出码 0 = 成功 / 1 = 失败 / 2 = 用法错误
 ```
 
 运行演示脚本（模块名不带 `.jua`，工作目录决定模块搜索路径）：

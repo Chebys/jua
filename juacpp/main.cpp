@@ -2,20 +2,26 @@
 #include <fstream>
 #include <filesystem>
 #include "jua-vm.h"
+
+#ifdef _WIN32
 #include <windows.h>
+#endif
 
 using namespace Jua;
 namespace fs = std::filesystem;
 using std::cout;
 
-void SetConsoleToUTF8() {
-    SetConsoleOutputCP(CP_UTF8);  // 设置输出编码为UTF-8
-    SetConsoleCP(CP_UTF8);        // 设置输入编码为UTF-8
+static void SetConsoleToUTF8(){
+#ifdef _WIN32
+    SetConsoleOutputCP(CP_UTF8);  // 输出编码
+    SetConsoleCP(CP_UTF8);        // 输入编码
+#endif
 }
 
 struct JuaRuntime: VM{
     const char* main; //主模块名称
     fs::path cwd;
+    bool failed = false; //本次运行是否已经报过错（决定退出码）
     JuaRuntime(const char* name, fs::path _cwd=fs::current_path()): main(name), cwd(_cwd){
         auto api = new Object(this);
         api->setProp("version", new String(this, "JuaRuntime 0.1"));
@@ -117,44 +123,69 @@ struct JuaRuntime: VM{
         cout << str << '\n';
     };
     void j_stderr(JuaError* err){
-        cout << err->toDebugString() << '\n';
+        //错误走 stderr，并标记本次运行失败；CLI 模式据此给出退出码
+        cout.flush();
+        std::cerr << err->toDebugString() << '\n';
+        std::cerr.flush();
+        failed = true;
     }
 };
 
-std::string getMultilineInput() {
-    // 以分号结尾表示输入结束
-    std::string result;
+// 读一条以分号结尾的多行输入。返回 false 表示输入已结束（EOF）。
+bool readInput(std::string& result){
+    result.clear();
     std::string line;
     while (true) {
-        std::cout << "> ";
-        std::getline(std::cin, line);
+        std::cout << "> " << std::flush;
+        if (!std::getline(std::cin, line)) return false; // EOF：必须退出，否则会空转
         result += line;
-        if (!line.empty() && line.back() == ';') break;
+        if (!line.empty() && line.back() == ';') return true;
         result += '\n';
     }
-    
-    return result;
 }
 
 int main(int argc, char* argv[]){
     SetConsoleToUTF8();
-    if(argc > 1){
-        const char* main_module = argv[1];
-        JuaRuntime runtime(main_module);
-        runtime.run();
-    }else{
+    if(argc <= 1){
+        //无参数：REPL
         cout << "Jua REPL. Add ';' to end input. Type 'exit;' to quit.\n";
         JuaRuntime rt("<repl>");
         while (true) {
-            std::string input = getMultilineInput();
-            if (input.empty()) continue;
+            std::string input;
+            if (!readInput(input)) break;
             if (input == "exit;") break;
             try{
                 rt.eval(input);
             }catch(JuaError* e){
                 rt.j_stderr(e);
+            }catch(const std::string& s){
+                std::cerr << s << '\n';
+            }catch(const char* s){
+                std::cerr << s << '\n';
             }
         }
+        return 0;
     }
-    return 0;
+
+    //带参数：运行一个模块。退出码 0 = 成功，1 = 失败，2 = 用法错误
+    try{
+        JuaRuntime rt(argv[1]);
+        rt.run();
+        return rt.failed ? 1 : 0;
+    }catch(JuaError* e){
+        std::cerr << e->toDebugString() << '\n';
+        return 1;
+    }catch(const std::string& s){
+        std::cerr << s << '\n';
+        return 1;
+    }catch(const char* s){
+        std::cerr << s << '\n';
+        return 1;
+    }catch(const std::exception& e){
+        std::cerr << "std::exception: " << e.what() << '\n';
+        return 1;
+    }catch(...){
+        std::cerr << "unknown error\n";
+        return 1;
+    }
 }

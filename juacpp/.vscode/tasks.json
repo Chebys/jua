@@ -1,7 +1,7 @@
 {
     // See https://go.microsoft.com/fwlink/?LinkId=733558
     // for the documentation about the tasks.json format
-    // gc.cpp is the garbage collector; keep this list in sync with build.ps1.
+    // Single host: main.cpp. test.cpp is deprecated and no longer built.
     // Artifacts go to ../build/ so that juacpp/ holds sources only.
     "version": "2.0.0",
     "tasks": [
@@ -12,19 +12,8 @@
             "args": [
                 "-std=c++20", "-g",
                 "-I./include",
-                "debug.cpp", "value.cpp", "gc.cpp", "parser.cpp", "program.cpp", "vm.cpp", "m-math.cpp", "m-json.cpp", "test.cpp",
-                "-o", "../build/jua.exe"
-            ]
-        },
-        {
-            "label": "repl-build",
-            "type": "shell",
-            "command": "g++",
-            "args": [
-                "-std=c++20",
-                "-I./include",
                 "debug.cpp", "value.cpp", "gc.cpp", "parser.cpp", "program.cpp", "vm.cpp", "m-math.cpp", "m-json.cpp", "main.cpp",
-                "-o", "../build/repl.exe"
+                "-o", "../build/jua.exe"
             ]
         }
     ]

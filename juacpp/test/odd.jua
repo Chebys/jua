@@ -21,3 +21,8 @@ eq(f(21), 42, 'fun with = body')
 
 fun show(v){ return v }
 eq(show "tail", 'tail', 'trailing string as single argument')
+
+// 无参的块实参用 primary block 形式：f{...}（f(){} 是语法错误，见 syntax.jua）
+fun invoke(blk){ return blk() }
+eq(invoke{ return 7 }, 7, 'primary block as sole argument')
+eq(invoke{ return 8 }, 8, 'primary block is a fresh closure each time')

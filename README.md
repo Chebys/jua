@@ -61,3 +61,13 @@ throws(fun(){ null.missing }, 'missing property')
 ```
 
 断言库是 [juacpp/test/harness.jua](juacpp/test/harness.jua)，纯 Jua 实现，不依赖宿主。
+
+语法错误没法用 `try{}` 捕获（解析在求值之前），所以用文件首行的标记声明「本用例应当失败」：
+
+```jua
+// expect-error: Trailing block call requires a parameter list
+let f = fun(){ return 1 }
+f(){ }
+```
+
+`run-tests.ps1` 要求这类用例**必须非零退出**，且输出里包含标记的文本。

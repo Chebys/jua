@@ -668,21 +668,24 @@ Expr* parsePrimaryTail(Expr* start, TokensReader& reader){
         case Token::PAREN:{
             reader.read();
             auto cl = static_cast<Enclosure*>(next);
-            Call* call;
             auto funbody = reader.preview();
             if(funbody && funbody->type==Token::BRACE){
+                //primary func_body：参数列表不能为空。无参的块实参请写成 f{...}
+                if(cl->reader.end())
+                    throw new JuaSyntaxError(
+                        "Trailing block call requires a parameter list; write f{ ... } for a zero-parameter function",
+                        -1, -1, -1);
                 reader.read();
                 auto params = parseDecList(cl->reader);
+                cl->reader.assetEnd();
                 auto cl2 = static_cast<Enclosure*>(funbody);
                 auto stmts = parseStatements(cl2->reader);
                 auto func = new FunExpr(params, stmts);
                 auto args = new FlexibleList({func});
-                call = new Call(start, args);
-            }else{
-                auto args = parseFlexExprList(cl->reader);
-                call = new Call(start, args);
+                return parsePrimaryTail(new Call(start, args), reader);
             }
-            return parsePrimaryTail(call, reader);
+            auto args = parseFlexExprList(cl->reader);
+            return parsePrimaryTail(new Call(start, args), reader);
         }
         case Token::BRACKET:{
             reader.read();

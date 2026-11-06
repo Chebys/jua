@@ -1,0 +1,6 @@
+// expect-error: Trailing block call requires a parameter list
+// f(){...} 不是「无参的尾随块调用」：尾随块实参必须带参数列表，
+// 无参时写成 f{...}（primary block 形式）。见 draft/表达式.md 的「调用」一节。
+
+let f = fun(){ return 1 }
+f(){ }

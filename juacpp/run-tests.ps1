@@ -1,5 +1,12 @@
 # Runs every assertion-based test in ./test and reports a summary.
-# Each test is self-checking: it exits 0 on success, non-zero on failure.
+#
+# Two kinds of cases:
+#   1. normal    - the script self-checks and exits 0; non-zero means failure
+#   2. expected  - the first line is   // expect-error: <substring>
+#                  the script MUST fail, and stderr/stdout must contain <substring>
+#                  (used for syntax errors, which cannot be caught by try{} because
+#                   parsing happens before execution)
+#
 # NOTE: keep this file ASCII-only; Windows PowerShell 5.1 reads BOM-less files as ANSI.
 param([string]$Exe = '../build/jua.exe')
 $ErrorActionPreference = 'Stop'
@@ -19,20 +26,37 @@ try {
     $pass = 0
     $failed = @()
     foreach ($f in $files) {
+        $firstLine = Get-Content -LiteralPath $f.FullName -TotalCount 1
+        $expectError = $null
+        if ($firstLine -match '^//\s*expect-error:\s*(.+)$') { $expectError = $Matches[1].Trim() }
+
         # native stderr must not abort the loop, so relax EAP just for the call
         $old = $ErrorActionPreference
         $ErrorActionPreference = 'Continue'
         $out = & $exePath $f.BaseName 2>&1
         $code = $LASTEXITCODE
         $ErrorActionPreference = $old
+        $text = ($out | Out-String)
 
-        if ($code -eq 0) {
-            $pass++
-            '{0,-16} ok' -f $f.BaseName
-        } else {
+        $reason = $null
+        if ($expectError) {
+            if ($code -eq 0) {
+                $reason = "expected a failure containing '$expectError', but it succeeded"
+            } elseif ($text -notmatch [regex]::Escape($expectError)) {
+                $reason = "expected message containing '$expectError'"
+            }
+        } elseif ($code -ne 0) {
+            $reason = "exit $code"
+        }
+
+        if ($reason) {
             $failed += $f.BaseName
-            '{0,-16} FAIL (exit {1})' -f $f.BaseName, $code
+            '{0,-16} FAIL ({1})' -f $f.BaseName, $reason
             $out | ForEach-Object { '    ' + $_ }
+        } else {
+            $pass++
+            if ($expectError) { '{0,-16} ok (expected error)' -f $f.BaseName }
+            else              { '{0,-16} ok' -f $f.BaseName }
         }
     }
 

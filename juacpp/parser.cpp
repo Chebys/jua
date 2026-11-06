@@ -91,6 +91,12 @@ bool validWordStart(char c){
 bool isHex(char c){
     return '0'<=c && c<='9' || 'a'<=c && c<='f' || 'A'<=c && c<='F';
 }
+int hexVal(char c){
+    if('0'<=c && c<='9')return c-'0';
+    if('a'<=c && c<='f')return c-'a'+10;
+    if('A'<=c && c<='F')return c-'A'+10;
+    return -1; //不是十六进制数字
+}
 
 JuaSyntaxError* missing(char c){
     string msg;
@@ -221,7 +227,8 @@ struct ScriptReader: TokensReader{
     private:
     void throwError(const string& msg){
         //d_log(msg);
-        throw JuaSyntaxError(msg, pos, line, col);
+        //必须抛指针：宿主与 try() 都只 catch JuaError*
+        throw new JuaSyntaxError(msg, pos, line, col);
     }
     char readChar(){
         if(eof())throwError("Unfinished input");
@@ -355,21 +362,53 @@ struct ScriptReader: TokensReader{
         str.resize(1);
         return Token::symbol(str);
     }
-    char escape(bool allow_newline=false){
+    //把 `\` 之后的转义读入 out。可能产生多个字节（\u），因此不返回单个 char。
+    void readEscape(string& out, bool allow_newline=false){
         //从 `\` 后开始读取
         char c = readChar();
         if(c=='x'){
-            auto hex = substr(2);
-            size_t len;
-            uint8_t byte = std::stoi(hex, &len, 16);
-            if(len != 2)throw unexpected(hex);
-            forwardx(2);
-            return byte;
-        }else if(c=='u')throw "todo: \\u";
-        else if('0'<=c && c<='9')throw "todo: \\0";
-        else if(c=='\n' && !allow_newline)throwError("cannot wrap inside SQ string");
-        else if(escape_map.contains(c))return escape_map[c];
-        return c;
+            // \xXX：直接表示一个字节
+            char hi = readChar(), lo = readChar();
+            int h = hexVal(hi), l = hexVal(lo);
+            if(h < 0 || l < 0)throwError("\\x requires exactly two hex digits");
+            out.push_back((char)((h << 4) | l));
+            return;
+        }
+        if(c=='u'){
+            // \uXXXX：码点按 utf8 编码写入
+            uint32_t cp = 0;
+            for(int i=0; i<4; i++){
+                int v = hexVal(readChar());
+                if(v < 0)throwError("\\u requires exactly four hex digits");
+                cp = cp * 16 + (uint32_t)v;
+            }
+            if(cp >= 0xD800 && cp <= 0xDFFF)
+                throwError("\\u escape must not be a surrogate; only BMP code points are allowed");
+            if(cp <= 0x7F){
+                out.push_back((char)cp);
+            }else if(cp <= 0x7FF){
+                out.push_back((char)(0xC0 | (cp >> 6)));
+                out.push_back((char)(0x80 | (cp & 0x3F)));
+            }else{
+                out.push_back((char)(0xE0 | (cp >> 12)));
+                out.push_back((char)(0x80 | ((cp >> 6) & 0x3F)));
+                out.push_back((char)(0x80 | (cp & 0x3F)));
+            }
+            return;
+        }
+        if(c=='0'){
+            // \0：空字符 U+0000。注意后面紧跟数字也不构成八进制转义
+            out.push_back('\0');
+            return;
+        }
+        if(c>='1' && c<='9')
+            throwError("invalid numeric escape: only zero (NUL) is allowed");
+        if(c=='\n' && !allow_newline)throwError("cannot wrap inside SQ string");
+        if(escape_map.contains(c)){
+            out.push_back(escape_map[c]);
+            return;
+        }
+        out.push_back(c);
     }
     string readSQStr(){
         //从单引号之后开始读取
@@ -378,7 +417,7 @@ struct ScriptReader: TokensReader{
         while(true){
             char c = readChar();
             if(c=='\'')return value;
-            if(c=='\\')value.push_back(escape());
+            if(c=='\\')readEscape(value);
             else if(c=='\n')throwError("cannot wrap inside SQ string");
             else value.push_back(c);
         }
@@ -457,7 +496,7 @@ std::pair<string, Token*> ScriptReader::readDQStr(){
             }
             throwError("Invalid char");
         }
-        if(c=='\\')str.push_back(escape(true));
+        if(c=='\\')readEscape(str, true);
         else str.push_back(c);
     }
 }

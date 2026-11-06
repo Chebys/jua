@@ -15,3 +15,12 @@ let n = 42
 eq("n=$n", 'n=42', 'interp word')
 eq("n=${n + 1}", 'n=43', 'interp expr')
 eq("${'a'}${'b'}", 'ab', 'interp adjacent')
+
+// 转义：\0 只表示 U+0000；\x 直接给字节；\u 按 utf8 编码
+eq('\0':len(), 1, 'NUL is one byte')
+eq('\0':byte(0), 0, 'NUL is U+0000')
+eq('\x41', 'A', 'hex byte')
+eq('\u0041', 'A', 'ascii code point')
+eq('\u00e9', 'é', 'two-byte utf8 code point')
+eq('\u4e2d', '中', 'three-byte utf8 code point')
+eq('\u4e2d':len(), 3, 'three-byte utf8 length')

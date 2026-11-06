@@ -1,0 +1,5 @@
+// expect-error: only zero (NUL) is allowed
+// 数字转义只有 \0（U+0000）合法；\1～\9 不是转义。
+// 见 draft/词法.md「字面字符串求值」。
+
+let s = '\9'

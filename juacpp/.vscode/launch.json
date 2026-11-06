@@ -2,28 +2,29 @@
     // Use IntelliSense to learn about possible attributes.
     // Hover to view descriptions of existing attributes.
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    // Artifacts live in ../build (see tasks.json / build.ps1).
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "test",
+            "name": "run a demo",
             "type": "cppdbg",
             "request": "launch",
-            "preLaunchTask": "test-build",
-            "program": "${workspaceFolder}/test/test.exe",
-            "args": [],
+            "preLaunchTask": "jua-build",
+            "program": "${workspaceFolder}/../build/jua.exe",
+            "args": ["class"],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/test",
+            "cwd": "${workspaceFolder}/../demo",
             "environment": []
         },
         {
-            "name": "main",
+            "name": "repl",
             "type": "cppdbg",
             "request": "launch",
-            "preLaunchTask": "main-build",
-            "program": "${workspaceFolder}/test/main.exe",
+            "preLaunchTask": "repl-build",
+            "program": "${workspaceFolder}/../build/repl.exe",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/test",
+            "cwd": "${workspaceFolder}",
             "environment": []
         }
 

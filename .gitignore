@@ -1,3 +1,8 @@
-test/
+# 构建产物（脚本在 juacpp/build.ps1，产物统一放这里）
+build/
+
+# 历史上 test/ 被同时用来放 .exe，只忽略二进制，不要再忽略整个目录——
+# 那会让 .jua 测试用例彻底从版本库里消失（见 改进清单 P3-2）。
+juacpp/test/*.exe
+test/*.exe
 juacpp/gcm.cache/
-juacpp/test/

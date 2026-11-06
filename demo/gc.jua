@@ -1,0 +1,29 @@
+// 垃圾回收验证
+// 1) 大量短命对象不会让存活值数无界增长
+// 2) 递归函数造成的环（作用域 <-> 闭包）能被回收
+
+let before = Runtime.liveValues()
+
+let i = 0
+while(i < 100000){
+    let junk = {v = [1, 2, 3]}
+    i += 1
+}
+let mid = Runtime.liveValues()
+print("短命对象: before=$before mid=$mid 有界=${mid < 200000}")
+
+// 每次 makeClosure 都造一个环：作用域.dict -> 函数.upenv -> 同一个作用域
+// 引用计数无法回收这种结构，标记-清除可以
+fun makeClosure(n){
+    let self_ref = fun(){ return n }
+    return self_ref
+}
+i = 0
+while(i < 50000){
+    makeClosure(i)
+    i += 1
+}
+let stats = Runtime.gcStats()
+print("存活值数 ${stats.live}")
+print("累计回收 ${stats.freed} 个值，回收 ${stats.collections} 次")
+print("全部有界", stats.live < 200000)

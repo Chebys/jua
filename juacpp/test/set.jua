@@ -1,0 +1,17 @@
+// 集合语义：键唯一性 + in 运算符
+let {eq} = require 'harness'
+
+let s = {}
+s['a'] = true
+s['b'] = true
+s['a'] = true
+let n = 0
+for(k in s) n += 1
+eq(n, 2, 'object keys are unique')
+
+eq('a' in s, true, 'in object')
+eq('z' in s, false, 'in object missing')
+eq(1 in [1, 2, 3], true, 'in array')
+eq(4 in [1, 2, 3], false, 'in array missing')
+eq('ell' in 'hello', true, 'in string')
+eq('zzz' in 'hello', false, 'in string missing')

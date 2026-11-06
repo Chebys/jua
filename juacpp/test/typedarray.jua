@@ -1,0 +1,15 @@
+// Buffer 作为定长字节序列，以及在其上做数值视图
+let {eq} = require 'harness'
+
+let buf = Buffer(4)
+buf:write('abcd', 0)
+eq(buf:read(0, 4), 'abcd', 'write then read')
+eq(buf:read(), 'abcd', 'read all')
+buf[1] = 66
+eq(buf:read(1, 2), 'B', 'assign a byte')
+
+let f = Number.encodeFloat64(1.5)
+eq(f:len(), 8, 'float64 is 8 bytes')
+let tmp = Buffer(8)
+tmp:write(f)
+eq(Number.decodeFloat64(tmp:read(0, 8)), 1.5, 'round trip through a buffer')

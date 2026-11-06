@@ -1,0 +1,12 @@
+//String.byte 等价于 Number.decodeUint8
+//String.fromByte 等价于 Number.encodeUint8
+for(k in Number)print("Number.$k")
+print(String.fromByte(97, 98, 99, 100))
+print(Number.encodeUint8(97, 98, 99, 100))
+let bytes = 256:encodeInt16()
+print(bytes:len())
+print(Number.LITTLE_ENDIAN, bytes=='\x00\x01')
+print(Number.decodeInt16(bytes))
+bytes = 1234.5678:encodeFloat64()
+print(bytes:toHex())
+print(Number.decodeFloat64(bytes))

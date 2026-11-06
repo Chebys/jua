@@ -1,0 +1,57 @@
+//一些奇葩语法
+fun g(){
+    print('g()')
+}
+0xabcdefg
+
+"use strict";
+
+fun def({name, value}){
+	_G[name] = value
+}
+String.__call = fun(self, value)
+	= {name=self, value}
+
+def 'test'(v){
+	print(v)
+}
+test('hello')
+
+def 'jua' 'a joke'
+print("jua is $jua")
+
+fun If(cb){
+    return fun(cond){
+        if(cond)cb(cond)
+    }
+}
+
+fun While(cb){
+    return fun(cond){
+        while(cond){
+            cond = cb(cond)
+        }
+    }
+}
+
+let Promise = {
+    resolve(val){
+        return {
+            then(fn){ fn(val) }
+        }
+    }
+}
+Promise.resolve(true).then(If(cond){
+    print('条件成立', cond)
+})
+Promise.resolve('test').then(If(cond){
+    print('条件成立', cond)
+})
+Promise.resolve(0).then(If(cond){
+    print('条件成立', cond)
+})
+
+Promise.resolve(5).then(While(n){
+    print('剩余', n)
+    return n-1
+})

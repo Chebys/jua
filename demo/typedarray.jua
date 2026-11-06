@@ -1,0 +1,48 @@
+let TypedArray = class({
+	init(self, format, lengthOrBuffer){
+		format = format[0]:upper() + format:slice(1)
+		self.encoder = Number['encode'+format]
+		if(!self.encoder)throw 'Invalid format: '+format
+		self.decoder = Number['decode'+format]
+		self.el_size = self.encoder(0):len()
+		if(lengthOrBuffer is Buffer){
+			self.buffer = buffer
+			self.length = buffer.length / self.el_size
+		}else{
+			self.length = Number(lengthOrBuffer)
+			self.buffer = Buffer(self.length * self.el_size)
+		}
+	},
+	len(self){
+		return self.length
+	},
+	getItem(self, pos){
+		pos *= self.el_size
+		let bytes = self.buffer:read(pos, pos+self.el_size)
+		return self.decoder(bytes)
+	},
+	setItem(self, pos, num){
+		let bytes = self.encoder(num)
+		pos *= self.el_size
+		self.buffer:write(bytes, pos)
+	},
+	next(self, key){
+		key ||= 0
+		let done = key>=self.length
+		return {
+			key = key+1,
+			value = done||self:getItem(key),
+			done
+		}
+	}
+})
+
+let arr = TypedArray('uint16', 4)
+print(arr.buffer.length)
+arr[0] = 97
+arr[1] = 98
+arr[2] = 99
+arr[3] = 100
+print(arr.buffer:read())
+for(n in arr)
+	print(n)

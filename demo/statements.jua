@@ -1,0 +1,30 @@
+if(true)
+	print('true.')
+else
+	print('unreachable')
+
+let i = 10
+while(true){
+    print('while', i)
+    i -= 1
+	if(i<5)break
+}
+for(i in 1..5)
+    print('for', i)
+let obj = {a=1, b=2, c=3}
+for(k in obj)
+	print(k+':', obj[k])
+
+switch(1+1)
+	case(0,1)
+		print('unreachable')
+	case(2,3)
+		print('good')
+	else
+		print('unreachable')
+
+fun func1(a){
+	return a+1
+} //等价于 let func1 = fun(a){ return a+1 }
+fun func2(x) = x*x  //等价于 let func2 = fun(x){ return x*x }
+print(func1(100), func2(100));

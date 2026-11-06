@@ -1,0 +1,17 @@
+// 字面量：数字、字符串、转义、插值
+let {eq} = require 'harness'
+
+eq(123.456, 123.456, 'decimal')
+eq(0xfff, 4095, 'hex')
+eq(5e-2, 0.05, 'exponent')
+eq(-0.5, -0.5, 'negative')
+
+eq('abc\ndef':len(), 7, 'sq escape length')
+eq('a\tb':len(), 3, 'tab escape')
+eq("q\"q":len(), 3, 'escaped quote')
+eq(`abc\ndef`:len(), 8, 'raw string keeps backslash')
+
+let n = 42
+eq("n=$n", 'n=42', 'interp word')
+eq("n=${n + 1}", 'n=43', 'interp expr')
+eq("${'a'}${'b'}", 'ab', 'interp adjacent')

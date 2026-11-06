@@ -1,0 +1,25 @@
+// 对象：字面量、计算键、解构、默认值
+let {eq} = require 'harness'
+
+let k = 'kk'
+let o = {a = 1, b = 2, [k] = 3}
+eq(o.a, 1, 'prop access')
+eq(o['b'], 2, 'subscript access')
+eq(o['kk'], 3, 'computed key')
+eq(Object.hasOwn(o, 'a'), true, 'hasOwn present')
+eq(Object.hasOwn(o, 'zz'), false, 'hasOwn missing')
+
+let {a, b as renamed, ['kk'] as kk} = o
+eq(a, 1, 'destructure')
+eq(renamed, 2, 'destructure rename')
+eq(kk, 3, 'destructure computed key')
+
+fun withDefault({x = 10, y = 20}){ return x + y }
+eq(withDefault({}), 30, 'both defaults')
+eq(withDefault({y = 5}), 15, 'override one default')
+
+eq(Object.get(o, 'missing'), null, 'Object.get missing is null')
+Object.set(o, 'c', 9)
+eq(o.c, 9, 'Object.set')
+Object.del(o, 'c')
+eq(Object.hasOwn(o, 'c'), false, 'Object.del')

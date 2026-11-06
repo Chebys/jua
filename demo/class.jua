@@ -1,0 +1,71 @@
+let Person = class({
+	init(self, name, age){
+		self.name = name
+		self.age = age
+	},
+	talk(self){
+		print(self.name, self.age)
+	}
+})
+
+let Student = class({
+	super = Person,
+	init(self, name, score){
+		Person.init(self, name, 6) //或 self.super.init(self, name, 6)
+		self.score = score
+	},
+	talk(self){
+		print(self.name, self.age, self.score)
+	}
+})
+
+let reimu = Student('Reimu', 1000)
+reimu:talk()
+
+print('可重复迭代器')
+let Range = class({
+	init(self, start, end, step=1){
+		self.start = start
+		self.end = end
+		self.step = step
+	},
+	next(self, key){ //迭代函数不改变self的状态
+		if(type(key)!='number')
+			key = self.start
+		else
+			key += self.step
+		return {
+			key,
+			value = key,
+			done = key>=self.end
+		}
+	}
+})
+let range = Range(1, 10)
+for(num in range){
+	print(num)
+	if(num>5)
+		for(bignum in range) //会重新开始迭代
+			print(bignum)
+} //1,2,...,6,1,2,...,9,7,1,2,...
+
+print('一次性迭代器')
+let Iterator = class({
+	init(self, target, iterFn=target.next){
+		self.target = target
+		self.iterFn = iterFn
+		self.key = null
+	},
+	next(self){ //迭代函数会改变self的状态
+		let {done, value?, key?} = self.iterFn(self.target, self.key)
+		if(!done)self.key = key
+		return {key, value, done}
+	}
+})
+let iterator = Iterator(range)
+for(num in iterator){
+	print(num)
+	if(num>5)
+		for(bignum in iterator) //不会重新开始迭代
+			print(bignum)
+} //1,2,...,9

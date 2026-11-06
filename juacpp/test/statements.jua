@@ -1,0 +1,44 @@
+// 语句：if/while/for/switch 与 break/continue/return
+let {eq} = require 'harness'
+
+fun grade(n){
+    if(n >= 90) return 'A'
+    else if(n >= 60) return 'B'
+    return 'C'
+}
+eq(grade(95), 'A', 'if chain 1')
+eq(grade(70), 'B', 'if chain 2')
+eq(grade(10), 'C', 'if chain 3')
+
+let sum = 0
+let i = 0
+while(i < 10){
+    i += 1
+    if(i > 5) break
+    if(i == 3) continue
+    sum += i
+}
+eq(sum, 1 + 2 + 4 + 5, 'while with break and continue')
+
+let r = 0
+for(k in 1..5) r += k
+eq(r, 10, 'for over range is end-exclusive')
+
+fun sw(n){
+    switch(n)
+        case(1, 2) return 'low'
+        case(3) return 'mid'
+        else return 'high'
+}
+eq(sw(1), 'low', 'switch case 1')
+eq(sw(2), 'low', 'switch case 2')
+eq(sw(3), 'mid', 'switch case 3')
+eq(sw(9), 'high', 'switch else')
+
+fun early(n){
+    for(k in 1..100){
+        if(k == n) return k
+    }
+    return -1
+}
+eq(early(3), 3, 'return from loop')

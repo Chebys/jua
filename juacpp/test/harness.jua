@@ -1,0 +1,46 @@
+// 极简断言库：失败即抛错，由 CLI 宿主转成非零退出码。
+// 用法：let {eq, ok, ne, near, throws} = require 'harness'
+
+fun describe(v){
+    if(type(v) == 'string')return '"' + v + '"'
+    return String(v)
+}
+
+fun ok(cond, label){
+    if(!cond)
+        throw 'FAIL [' + (label || 'assert') + ']: expected truthy, got ' + describe(cond)
+}
+
+fun eq(got, want, label){
+    if(got != want)
+        throw 'FAIL [' + (label || 'eq') + ']: got ' + describe(got) + ', want ' + describe(want)
+}
+
+fun ne(got, unwanted, label){
+    if(got == unwanted)
+        throw 'FAIL [' + (label || 'ne') + ']: got unwanted ' + describe(got)
+}
+
+fun near(got, want, label){
+    let d = got - want
+    if(d < 0)d = -d
+    if(d > 1e-9)
+        throw 'FAIL [' + (label || 'near') + ']: got ' + describe(got) + ', want ~' + describe(want)
+}
+
+// 断言 fn 抛出 jua 错误
+fun throws(fn, label){
+    let res = try(fn)
+    if(res.status)
+        throw 'FAIL [' + (label || 'throws') + ']: expected an error, got ' + describe(res.value)
+}
+
+// 断言 fn 正常返回，并把返回值交出来
+fun returns(fn, label){
+    let res = try(fn)
+    if(!res.status)
+        throw 'FAIL [' + (label || 'returns') + ']: unexpected error: ' + describe(res.error)
+    return res.value
+}
+
+return {ok, eq, ne, near, throws, returns, describe}

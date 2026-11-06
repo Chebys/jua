@@ -1,0 +1,19 @@
+// 编码：Number.encodeXXX / decodeXXX 与 String 的字节接口
+let {eq, ok} = require 'harness'
+
+eq(Number.encodeUint8(97, 98), 'ab', 'encodeUint8')
+eq(Number.decodeUint8('A'), 65, 'decodeUint8')
+eq(Number.encodeUint16(1):len(), 2, 'uint16 is 2 bytes')
+eq(Number.encodeUint32(1):len(), 4, 'uint32 is 4 bytes')
+eq(Number.decodeUint16(Number.encodeUint16(513)), 513, 'uint16 round trip')
+eq(Number.decodeInt16(Number.encodeInt16(-2)), -2, 'int16 round trip')
+eq(Number.decodeFloat64(Number.encodeFloat64(1.5)), 1.5, 'float64 round trip')
+eq(type(Number.LITTLE_ENDIAN), 'boolean', 'LITTLE_ENDIAN is boolean')
+
+eq(String.fromByte(97, 98, 99), 'abc', 'fromByte')
+eq('abc':byte(0), 97, 'byte')
+eq('AbC':upper(), 'ABC', 'upper')
+eq('AbC':lower(), 'abc', 'lower')
+eq('hello':slice(1, 3), 'el', 'slice')
+eq('hello':len(), 5, 'len')
+eq('hello':toHex(), '68 65 6c 6c 6f', 'toHex')

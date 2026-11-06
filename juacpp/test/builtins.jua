@@ -1,0 +1,36 @@
+// 内置值：Array / Buffer / Function / try / throw
+let {eq, ok, throws} = require 'harness'
+
+let a = Array.of(1, 2, 3)
+eq(a:len(), 3, 'array len')
+a:push(4)
+eq(a:len(), 4, 'push')
+eq(a:pop(), 4, 'pop')
+eq(a[0], 1, 'getItem')
+a[0] = 9
+eq(a[0], 9, 'setItem')
+eq(a:join('-'), '9-2-3', 'join')
+eq(Array.of(1, 2) is Array, true, 'array is instance of Array')
+
+let b = Buffer(4)
+b:write('abcd')
+eq(b.length, 4, 'buffer length')
+eq(b[0], 97, 'buffer item')
+eq(b:read(0, 2), 'ab', 'buffer read')
+
+let add = Function('p', 'q', 'return p + q')
+eq(add(2, 3), 5, 'Function constructor')
+
+let okres = try(fun(){ return 42 })
+eq(okres.status, true, 'try ok status')
+eq(okres.value, 42, 'try ok value')
+
+let erres = try(fun(){ throw 'boom' })
+eq(erres.status, false, 'try error status')
+ok(type(erres.error) == 'string', 'error surfaces as text')
+
+let caught = null
+try{ throw 'oops' }:catch(err){ caught = err }
+ok(type(caught) == 'string', 'catch receives the error')
+
+throws(fun(){ throw 'x' }, 'throws helper detects error')

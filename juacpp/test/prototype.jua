@@ -1,0 +1,27 @@
+// 原型：setProto/getProto、自定义迭代器
+let {eq, ok} = require 'harness'
+
+let base = {hello(self){ return 'base:' + self.tag }}
+let derived = {tag = 'd'}
+Object.setProto(derived, base)
+eq(derived:hello(), 'base:d', 'method from prototype')
+eq(Object.getProto(derived), base, 'getProto')
+Object.setProto(derived, null)
+eq(Object.getProto(derived), null, 'setProto null')
+
+// 可重复迭代器：不改变自身状态
+let Range = class({
+    init(self, n){ self.n = n },
+    next(self, key){
+        key ||= 0
+        let done = key >= self.n
+        return {key = key + 1, value = key, done}
+    }
+})
+let rg = Range(4)
+let s1 = 0
+for(v in rg) s1 += v
+eq(s1, 6, 'custom iterator first pass')
+let s2 = 0
+for(v in rg) s2 += v
+eq(s2, 6, 'custom iterator is reusable')

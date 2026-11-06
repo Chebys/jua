@@ -1,0 +1,28 @@
+// 垃圾回收：短命对象有界、闭包环可回收
+let {eq, ok} = require 'harness'
+
+let before = Runtime.liveValues()
+eq(type(before), 'number', 'liveValues returns a number')
+
+let i = 0
+while(i < 60000){
+    let junk = {v = [1, 2, 3]}
+    i += 1
+}
+let s = Runtime.gcStats()
+ok(s.collections > 0, 'at least one collection happened')
+ok(s.live < 60000, 'live value count is bounded')
+
+// 每次 makeClosure 都造一个“作用域 <-> 闭包”的环
+fun makeClosure(n){
+    let self_ref = fun(){ return n }
+    return self_ref
+}
+i = 0
+while(i < 20000){
+    makeClosure(i)
+    i += 1
+}
+let after = Runtime.gcStats()
+ok(after.live < 60000, 'cyclic closures were collected')
+ok(after.freed > 10000, 'many values were freed')

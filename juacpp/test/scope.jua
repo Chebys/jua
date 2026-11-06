@@ -1,0 +1,34 @@
+// 作用域：闭包、遮蔽、local 关键字
+let {eq, ok} = require 'harness'
+
+let x = 1
+fun readX(){ return x }
+eq(readX(), 1, 'closure reads outer binding')
+
+fun shadow(){
+    let x = 2
+    return x
+}
+eq(shadow(), 2, 'inner declaration shadows outer')
+eq(x, 1, 'outer binding unchanged')
+
+eq(type(local), 'object', 'local is a scope object')
+
+fun declaresHere(){
+    let y = 5
+    return Object.hasOwn(local, 'y')
+}
+eq(declaresHere(), true, 'local owns declared variable')
+
+let g = 9
+fun readG(){ return g }
+eq(readG(), 9, 'global is visible')
+
+fun counter(){
+    let n = 0
+    return fun(){ n += 1; return n }
+}
+let c = counter()
+eq(c(), 1, 'closure keeps state 1')
+eq(c(), 2, 'closure keeps state 2')
+eq(c(), 3, 'closure keeps state 3')

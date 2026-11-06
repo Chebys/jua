@@ -1,0 +1,13 @@
+// 模块：内置 math / json，以及模块缓存
+let {eq, ok} = require 'harness'
+
+let JSON = require 'json'
+eq(type(JSON), 'object', 'json module is an object')
+eq(JSON.encode({a = 1}), '{"a":1}', 'json encode object')
+eq(JSON.decode('{"a":1}').a, 1, 'json decode object')
+eq(JSON.decode('[1,2]')[1], 2, 'json decode array')
+
+let {PI, floor} = require 'math'
+eq(floor(PI), 3, 'math floor via destructuring')
+ok(PI > 3 && PI < 4, 'math PI range')
+eq(require('math') == require('math'), true, 'module value is cached')

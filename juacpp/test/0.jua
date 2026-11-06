@@ -1,0 +1,13 @@
+// 冒烟测试：最基本的求值路径
+let {eq, ok} = require 'harness'
+
+eq(1 + 2, 3, 'add')
+eq('a' + 'b', 'ab', 'concat')
+eq(type(1), 'number', 'type number')
+eq(type('x'), 'string', 'type string')
+eq(type(null), 'null', 'type null')
+eq(type({}), 'object', 'type object')
+eq(type(fun(){}), 'function', 'type function')
+ok(!false, 'not')
+eq(if(true) 1 else 2, 1, 'ternary true')
+eq(if(false) 1 else 2, 2, 'ternary false')

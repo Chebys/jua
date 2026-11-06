@@ -1,0 +1,36 @@
+// 表达式：优先级、赋值、复合赋值、方法包装、可选访问
+let {eq, ok} = require 'harness'
+
+eq(-1 + 2 * (3 - 4), -3, 'precedence')
+eq(10 / 4, 2.5, 'division is float')
+ok(1 < 2 && 3 > 2, 'logical and')
+ok(false || true, 'logical or')
+eq(!(1 > 2), true, 'not')
+eq(7 >= 7, true, 'ge')
+eq(7 <= 6, false, 'le')
+
+let x, y, z
+x = y = z = 2
+eq(x, 2, 'chained assign x')
+eq(y, 2, 'chained assign y')
+eq(z, 2, 'chained assign z')
+
+let s = 'ab'
+s += 'cd'
+eq(s, 'abcd', 'compound add')
+
+let t = null
+t ||= 'default'
+eq(t, 'default', 'logical assign or')
+t &&= 'changed'
+eq(t, 'changed', 'logical assign and')
+
+let o = {v = 1}
+o.v += 2
+eq(o.v, 3, 'property compound assign')
+
+let obj = {name = 'jua', meth(self, n){ return self.name + n }}
+eq(obj:meth('!'), 'jua!', 'method wrapper')
+let bound = obj:meth
+eq(bound('?'), 'jua?', 'method wrapper escapes')
+eq(obj?.missing, null, 'optional prop')

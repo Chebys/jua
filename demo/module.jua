@@ -1,0 +1,5 @@
+let JSON = require 'json'
+print(JSON.encode({a=1, b=['m','q']}))
+
+let {PI, cos, floor} = require 'math'
+print(PI, cos(PI), floor(1.9))

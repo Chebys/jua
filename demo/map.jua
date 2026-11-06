@@ -1,0 +1,59 @@
+//let {stringify} = require('set')
+let Map = class({
+	stringify(key){
+		let t = type(key)
+		let str
+		if(t=='object' || t=='function')
+			str = Object.id(key):toString(16)
+		else
+			str = String(key)
+		return t+str
+	},
+	init(self, list){
+		self._ = {}
+		if(list)
+			for([key, val] in list)
+				self:setItem(key, val)
+	},
+	setItem(self, key, val){
+		let str = Map.stringify(key)
+		self._[str] = [key, val] //如果不要求迭代键，则只需存值
+	},
+	getItem(self, key){
+		let str = Map.stringify(key)
+		if(str in self._)
+			return self._[str][1]
+		return null
+	},
+	hasItem(self, key){
+		let str = Map.stringify(key)
+		return str in self._
+	},
+	del(self, key){
+		let str = Map.stringify(key)
+		Object.del(self._, str)
+	},
+	next(self, key){
+		let {key?, value?, done} = Object.next(self._, key)
+		return {
+			key,
+			value = done||self._[key],
+			done
+		}
+	},
+	toJSON(self){
+		let obj = {}
+		for([k, v] in self){
+			if(type(k)=='string')
+				obj[k] = v
+		}
+		return obj
+	}
+})
+let o1={}, o2={}, o3=o1, map=Map([
+	[o1, 1],
+	[o2, o1],
+	[1, 'test']
+])
+print(map[o3], map[o2], map[1])
+return Map

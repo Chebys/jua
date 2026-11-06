@@ -1,0 +1,17 @@
+print(-1+2*(3-4), 'qwe'+'asd')
+print(!(1>2 || 'abc'=='abc'))
+print(if(1=='1') 'bad' else 'good')
+
+let x,y,z
+print(x=y=z=2, x, y, z, y=z+=1, y, z)
+
+let obj = {name='老爷爷', poet={}}
+print(obj.poet, obj['poet'], obj?.nonexistent)
+obj.poet['name'] = '龚诗锋'
+obj.poet['chant'] = fun(){ print('梦厷停留在，破了大式样。') }
+obj.poet.chant()
+obj.talk = fun(self){ print("This is ${self.name}.") }
+obj:talk() //相当于 obj.talk(obj)
+obj.talk(obj.poet)
+let bound_method = obj:talk
+bound_method()

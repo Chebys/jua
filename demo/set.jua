@@ -1,0 +1,73 @@
+let Set = class({
+	stringify(key){
+		let t = type(key),
+			str =
+		if(t=='object' || t=='function')
+			Object.id(key):toString(16)
+		else
+			String(key)
+		return t+str
+	},
+	init(self, list){
+		self._ = {}
+		if(list)
+			for(item in list)
+				self:add(item)
+	},
+	add(self, item){
+		let key = Set.stringify(item)
+		self._[key] = item
+	},
+	del(self, item){
+		let key = Set.stringify(item)
+		Object.del(self._, key)
+	},
+	hasItem(self, item){
+		let key = Set.stringify(item)
+		return key in self._
+	},
+	getItem(self, item){
+		return self:hasItem(item)
+	},
+	setItem(self, key, val){
+		if(val)
+			self:add(key)
+		else
+			self:del(key)
+	},
+	next(self, key){
+		let {key?, value?, done} = Object.next(self._, key)
+		return {
+			key,
+			value = done||self._[key],
+			done
+		}
+	},
+	__add(self, set){
+		let newset = Set(self)
+		for(item in set)
+			newset:add(item)
+		return newset
+	},
+	__sub(self, set){
+		let newset = Set(self)
+		for(item in set)
+			newset:del(item)
+		return newset
+	},
+	__mul(self, set){
+		let newset = Set()
+		for(item in self)
+			if(item in set)
+				newset:add(item)
+	},
+	toString(self){
+		return '{'+Array.join(self, ', ')+'}'
+	}
+})
+
+let set1 = Set([1,2,{},fun(){},'test',2,'test'])
+print(set1)
+let set2 = Set([1,2,{},'test'])
+print(set1-set2, set1+set2)
+return Set

@@ -1,0 +1,15 @@
+// 以对象为键：Object.id 提供稳定标识
+let {eq, ok, ne} = require 'harness'
+
+let o1 = {}, o2 = {}
+ne(Object.id(o1), Object.id(o2), 'ids are distinct')
+eq(Object.id(o1), Object.id(o1), 'id is stable')
+eq(type(Object.id(o1)), 'number', 'id is a number')
+ok(Object.id(o1) >= 0, 'id is non-negative')
+
+let m = {}
+m[String(Object.id(o1))] = 'first'
+m[String(Object.id(o2))] = 'second'
+eq(m[String(Object.id(o1))], 'first', 'lookup key 1')
+eq(m[String(Object.id(o2))], 'second', 'lookup key 2')
+eq(Object.get(m, String(Object.id({}))), null, 'unknown key')

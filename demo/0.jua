@@ -1,0 +1,16 @@
+let L = class({
+	init(self, items){
+		self.items = items
+	},
+	setItem(self, range, value){
+		for(i in range){
+			self.items[i] = value:shift()
+		}
+	},
+	toString(self){
+		return self.items:toString()
+	}
+})
+let l = L([1,2,3,4,5])
+l[1..4] = [9,8,7]
+print(l)

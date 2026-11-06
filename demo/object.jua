@@ -1,0 +1,20 @@
+let key = 'abc'
+let obj = {
+    key,
+    [key] = 123,
+    name = 'none',
+	meth(self){
+		print(self.name)
+	}
+}
+print(obj) // {key, abc, name, meth}
+let {abc, key as prop, ['name'] as name, meth} = obj;
+print(abc, prop, name, meth) // 123 abc none <function>
+meth(obj) // none
+
+fun log({name='unkonwn', key, value}?){
+	// 等价于 ({name='unkonwn', key=null, value=null}=null)
+	print(name, key, value)
+}
+log(obj) // none abc null
+log({value=123}) //unkonwn null 123

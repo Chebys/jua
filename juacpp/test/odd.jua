@@ -1,0 +1,23 @@
+// 解析边角：可选分号、尾随逗号、简写、单语句体、尾随字符串调用
+let {eq} = require 'harness'
+
+let a = 1; let b = 2
+eq(a + b, 3, 'optional semicolons')
+
+let arr = [1, 2, 3,]
+eq(arr:len(), 3, 'array trailing comma')
+let o = {x = 1, y = 2,}
+eq(o.y, 2, 'object trailing comma')
+
+let name = 'jua'
+let obj = {name, shout(self){ return self.name + '!' }}
+eq(obj:shout(), 'jua!', 'property and method shorthand')
+
+if(true) eq(1, 1, 'if single statement')
+for(i in 1..1) eq(0, 1, 'empty range runs nothing')
+
+let f = fun(x) = x * 2
+eq(f(21), 42, 'fun with = body')
+
+fun show(v){ return v }
+eq(show "tail", 'tail', 'trailing string as single argument')

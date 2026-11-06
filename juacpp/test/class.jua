@@ -1,0 +1,26 @@
+// 类：class()、init、super、方法覆盖、is
+let {eq, ok} = require 'harness'
+
+let Person = class({
+    init(self, name){ self.name = name },
+    greet(self){ return 'hi ' + self.name }
+})
+let Student = class({
+    super = Person,
+    init(self, name, score){
+        Person.init(self, name)
+        self.score = score
+    },
+    greet(self){ return 'hi ' + self.name + '/' + String(self.score) }
+})
+
+let p = Person('ann')
+let s = Student('bob', 100)
+eq(p:greet(), 'hi ann', 'base class')
+eq(s:greet(), 'hi bob/100', 'subclass override')
+eq(s.name, 'bob', 'init of base via super')
+eq(s.score, 100, 'own init')
+eq(type(p), 'object', 'instance type')
+ok(s is Person, 'subclass instance is base instance')
+ok(!(p is Student), 'base instance is not subclass instance')
+ok(!(Person is Student), 'classes are distinct')

@@ -1,0 +1,26 @@
+print(type(local)) //local 关键字用于获取当前作用域对象
+let a=1, b=2
+print(local, local.a, local.b)
+
+let x=1
+fun test(){
+	print(x, y) // 1 2
+	x=3
+	print(Object.hasOwn(local, 'x')) // false
+	//作用域对象从父作用域继承属性
+	print(local, local.x) // {} 3
+	let x=4
+	print(local, local.x) // {x} 4
+	if(1){
+		x=5
+		print(local, local.x) // {} 5
+		let x=6
+		print(local, local.x) //{x} 6
+		Object.del(local, 'x')
+		print(local, local.x) // {} 5
+	}
+	print(x) // 5
+}
+let y=2
+test()
+print(x) //3

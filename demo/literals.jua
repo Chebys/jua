@@ -1,0 +1,14 @@
+print('hello jua？。只怕遮著了这相扑！')
+print(null, true)
+print(123.456, 5e-2, 0xfff)
+print(fun(){})
+
+let obj = {a=1, b=2}
+print(obj.a, obj.b)
+
+let arr = [1, 2, obj]
+print(arr[0], arr[1], arr[2])
+
+print("obj=$obj, arr=$arr, ${arr[0]}+${arr[1]}=${arr[0]+arr[1]}")
+print('abc\ndef')
+print(`abc\ndef`)

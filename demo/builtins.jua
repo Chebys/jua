@@ -1,0 +1,36 @@
+let arr = Array.of(1,3,5)
+for(n in arr)
+	print(n)
+let copy = Array(arr)
+copy[0] = 0
+for(n in [0,1,2])
+	print(arr[n], copy[n])
+
+let buffer = Buffer(4)
+buffer:write('abcd')
+print(buffer[0], buffer[1], buffer[2], buffer[3])
+
+let fn = Function('a', 'b', 'return a+b')
+print(fn(1,4))
+
+// lua 风格的错误捕获
+fun ccb(target){
+	print("$target，我给你踩背来咯")
+	throw('哇袄！！！')
+}
+let {status, value?, error?} = try(ccb, '老爷爷')
+if(status)
+	print(value)
+else
+	print(error)
+
+// js 风格的错误捕获
+try{
+	print('try')
+	throw 'this is an error'
+	print('unreachable')
+}:catch(err){
+	print('caught:', err)
+} //等价于 try(fun(){ ... }):catch(fun(err){ ... })
+
+Runtime.alert(Runtime) //实现定义的api

@@ -544,8 +544,16 @@ Declarable* parseDeclarable(TokensReader& reader){
 }
 
 Expr* parseCond(TokensReader& reader){
-    //todo: if !(...)
+    //cond ::= '(' expr ')' | '!' '(' expr ')'，其中 if !(...) 是 if(!(...)) 的语法糖
     auto head = reader.read();
+    if(head->type == Token::UNIOP && head->str == "!"){
+        auto body = reader.read();
+        if(body->type != Token::PAREN)throw unexpected(body->str, "!(...)");
+        auto cl = static_cast<Enclosure*>(body);
+        auto cond = parseExpr(cl->reader);
+        cl->reader.assetEnd();
+        return new UnitaryExpr(UniOper::not_, cond);
+    }
     if(head->type!=Token::PAREN)throw unexpected(head->str, "(...)");
     auto cl = static_cast<Enclosure*>(head);
     auto cond = parseExpr(cl->reader);

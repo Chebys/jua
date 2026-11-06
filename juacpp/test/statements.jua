@@ -42,3 +42,17 @@ fun early(n){
     return -1
 }
 eq(early(3), 3, 'return from loop')
+
+// if !(...) 是 if(!(...)) 的语法糖
+fun sign(n){
+    if !(n > 0) return 'non-positive'
+    return 'positive'
+}
+eq(sign(-1), 'non-positive', 'if !(...) negates')
+eq(sign(1), 'positive', 'if !(...) falls through')
+
+let n = 0
+while !(n >= 3) n += 1
+eq(n, 3, 'while !(...)')
+
+eq(if !(true) 'a' else 'b', 'b', 'ternary with !(...)')

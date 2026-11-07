@@ -173,10 +173,22 @@ void VM::makeGlobal(){
 }
 Value* VM::require(const string& name){
     if(modules.contains(name))return modules[name];
-    //todo: 检查循环导入
+    //缓存发生在执行之后（见 draft/builtins/fns.md），因此执行期间再次导入
+    //同一个模块会导致重复执行，属于循环导入，直接报错
+    if(loading.contains(name))
+        throw new JuaError("循环导入：" + name);
     const string& script = findModule(name);
-    modules[name] = eval(script);
-    return modules[name];
+    loading.insert(name);
+    Value* value = nullptr;
+    try{
+        value = eval(script);
+    }catch(...){
+        loading.erase(name);
+        throw;
+    }
+    loading.erase(name);
+    modules[name] = value;
+    return value;
 }
 
 Object* VM::buildClass(NativeFunction::Native constructor){

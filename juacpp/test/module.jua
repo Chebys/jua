@@ -11,3 +11,12 @@ let {PI, floor} = require 'math'
 eq(floor(PI), 3, 'math floor via destructuring')
 ok(PI > 3 && PI < 4, 'math PI range')
 eq(require('math') == require('math'), true, 'module value is cached')
+
+// 文件模块：返回值即导出，且在执行完毕后写入缓存
+eq(require 'mod/ret', 42, 'module exports its return value')
+eq(require('mod/cache') == require('mod/cache'), true, 'file module is cached')
+
+// 循环导入不被允许：报错而不是无限递归
+let cyc = try{ require 'mod/cycle-a' }
+eq(cyc.status, false, 'circular import is rejected')
+ok(type(cyc.error) == 'string', 'circular import reports an error')

@@ -7,6 +7,7 @@ namespace Jua {
 
     struct VM{
     std::unordered_map<std::string, Value*> modules;
+    std::unordered_set<std::string> loading; //正在执行中的模块，用于检测循环导入
     std::unordered_set<Value*> ownedValues; //宿主长期持有的值，作为 GC 根
 
     //全部指针成员都必须初始化：任何未初始化的成员被当作 GC 根时，

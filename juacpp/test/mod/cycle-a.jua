@@ -1,0 +1,3 @@
+// 与 cycle-b 互相导入，用于验证循环导入会被拒绝
+require 'mod/cycle-b'
+return 'a'

@@ -33,4 +33,10 @@ let caught = null
 try{ throw 'oops' }:catch(err){ caught = err }
 ok(type(caught) == 'string', 'catch receives the error')
 
+// primary block 形式：try{...} 等价于 try(fun(){...})
+let viaBlock = try{ throw 'boom' }
+eq(viaBlock.status, false, 'try{ } 等价于 try(fun(){ })')
+let blockValue = try{ return 5 }
+eq(blockValue.value, 5, 'try{ } 内的 return 成为返回的值')
+
 throws(fun(){ throw 'x' }, 'throws helper detects error')

@@ -27,7 +27,7 @@ Value* Keyword::calc(Scope* env){
         case 'f': return Boolean::getInst(false);
         case 'l': return env;
     }
-    throw "Keyword::calc";
+    throw new JuaError("internal: unknown keyword");
 }
 Keyword* Keyword::null = new Keyword('n');
 Keyword* Keyword::t = new Keyword('t');
@@ -119,11 +119,11 @@ Value* OptionalPropRef::calc(Scope* env){
 Value* PropRef::calc(Scope* env){
     auto val = _calc(env);
     if(val)return val;
-    throw new JuaError(std::format("no property: {}", prop));
+    throw new JuaRefError(std::format("no property: {}", prop));
 }
 void PropRef::assign(Scope* env, Value* val){
     auto tar = expr->calc(env);
-    if(tar->type != Value::Obj)throw "not an object";
+    if(tar->type != Value::Obj)throw new JuaTypeError("cannot set a property on a non-object");
     auto obj = static_cast<Object*>(tar);
     obj->setProp(prop, val);
 }

@@ -225,7 +225,7 @@ struct ScriptReader: TokensReader{
     Token* read();
     Token* preview();
     private:
-    void throwError(const string& msg){
+    [[noreturn]] void throwError(const string& msg){
         //d_log(msg);
         //必须抛指针：宿主与 try() 都只 catch JuaError*
         throw new JuaSyntaxError(msg, pos, line, col);
@@ -465,7 +465,7 @@ Token* ScriptReader::doRead(){
     else if(c=='`')return new Token(Token::STR, readBQStr());
     else{
         d_log(c);
-        throw "todo: doRead";
+        throwError("unrecognized character");
     }
 }
 Token* ScriptReader::readStrTmpl(){
@@ -973,7 +973,8 @@ Statement* parseStatement(TokensReader& reader){
         if(start->str=="fun"){
             reader.read();
             auto name = reader.read();
-            if(!name->isValidVarname)throw "Invalid function name";
+            if(!name->isValidVarname)
+                throw new JuaSyntaxError("invalid function name", -1, -1, -1);
             auto func = parseFunc(reader);
             auto assignment = new DeclarationItem(new Varname(name->str), func);
             return new Declaration(new DeclarationList({assignment}));
@@ -1038,7 +1039,8 @@ Statement* parseStatement(TokensReader& reader){
             auto body = parseBlockOrStatement(reader);
             return new ForStmt(declarable, iterable, body);
         }
-        throw unexpected(start->str, "<statement>");
+        //其余关键字（null / true / false / local）是关键字表达式，落到下面按表达式语句处理。
+        //只有确实不能作为语句开头的关键字（else / case / as / in / is）才会在 parseExpr 里报错。
     }
     auto expr =  parseExpr(reader);
     return new ExprStatement(expr);

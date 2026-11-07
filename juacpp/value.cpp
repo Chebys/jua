@@ -331,7 +331,7 @@ string Number::toString(){
 }
 
 size_t correctIndex(Value* num, size_t len){
-    if(!len)throw new JuaError("index on empty value");
+    if(!len)throw new JuaRangeError("index on an empty value");
     int64_t i = num->toInt() % (int64_t)len;
     if(i < 0)i += (int64_t)len;
     return (size_t)i;
@@ -404,7 +404,7 @@ Value* Buffer::read(Value* _start, Value* _end){
     };
     int64_t start = clamp(_start, 0);
     int64_t end = clamp(_end, len);
-    if(start>=end)throw new JuaError("Buffer.read: invalid range");
+    if(start>=end)throw new JuaRangeError("Buffer.read: invalid range");
     size_t n = (size_t)(end-start);
     auto str = new String(vm);
     str->value.resize(n);
@@ -422,7 +422,7 @@ void Buffer::write(Value* _str, Value* _pos){
         if(pos < 0)pos = 0;
     }
     if(pos + (int64_t)str.size() > (int64_t)length)
-        throw new JuaError("Buffer.write: out of range");
+        throw new JuaRangeError("Buffer.write: out of range");
     if(str.size())memcpy(bytes+pos, str.data(), str.size());
 }
 

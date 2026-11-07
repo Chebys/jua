@@ -108,7 +108,7 @@ struct OperAssignment: Expr{
     OperAssignment(BinOper t, Expr* l, Expr* r): type(t), left(l), right(r){
         assignee = dynamic_cast<LeftValue*>(l);
         if(!assignee)
-            throw "Cannot assign to non-leftvalue";
+            throw new JuaError("Cannot assign to non-leftvalue", JuaError::Kind::Syntax);
     }
     Value* calc(Scope* env);
 };

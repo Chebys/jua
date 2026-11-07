@@ -158,6 +158,7 @@ int main(int argc, char* argv[]){
                 rt.eval(input);
             }catch(JuaError* e){
                 rt.j_stderr(e);
+                delete e;
             }catch(const std::string& s){
                 std::cerr << s << '\n';
             }catch(const char* s){
@@ -174,6 +175,7 @@ int main(int argc, char* argv[]){
         return rt.failed ? 1 : 0;
     }catch(JuaError* e){
         std::cerr << e->toDebugString() << '\n';
+        delete e;
         return 1;
     }catch(const std::string& s){
         std::cerr << s << '\n';

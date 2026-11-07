@@ -71,7 +71,7 @@ inline Value* operate(UniOper type, Value* val){
     switch (type){
         case UniOper::unm: return val->unm();
         case UniOper::not_: return Boolean::getInst(!val->toBoolean());
-        default: throw "todo: UniOper";
+        default: throw new JuaError("unimplemented binary operator");
     }
 }
 inline Value* operate(BinOper type, Value* left, Value* right){

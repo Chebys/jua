@@ -276,16 +276,31 @@ struct JuaIterator{
     //把自己当前持有的值登记进 GC 根集合（在 next() 之前调用）
     virtual void rootValues(VM* vm){}
 };
+// Jua 错误。所有抛出点都必须抛指针（JuaError*）：宿主与 try() 只 catch 指针，
+// 按值抛出会落到 catch(...) 并丢失消息（历史 bug，见 改进清单 附C #12）。
 struct JuaError{
+    enum class Kind{Error, Client, Syntax, Type, Reference, Range};
     std::string message;
-    JuaError(std::string msg): message(msg){}
+    Kind kind = Kind::Error;
+    JuaError(std::string msg, Kind k = Kind::Error): message(std::move(msg)), kind(k){}
     JuaError(): JuaError("Unknown JuaError"){}
     virtual ~JuaError() = default;
     virtual std::string toDebugString();
+    static const char* kindName(Kind k){
+        switch(k){
+            case Kind::Client:    return "client";
+            case Kind::Syntax:    return "syntax";
+            case Kind::Type:      return "type";
+            case Kind::Reference: return "reference";
+            case Kind::Range:     return "range";
+            default:              return "error";
+        }
+    }
+    const char* kindName() const { return kindName(kind); }
 };
 struct JuaErrorWithVal: JuaError{
     Value* val;
-    JuaErrorWithVal(std::string msg, Value* v): JuaError(msg), val(v){}
+    JuaErrorWithVal(std::string msg, Value* v): JuaError(msg, Kind::Reference), val(v){}
     std::string toDebugString(){
         std::string str = message;
         str.append("\n\twith value: ");
@@ -294,8 +309,16 @@ struct JuaErrorWithVal: JuaError{
     }
 };
 struct JuaTypeError: JuaError{
-    JuaTypeError(std::string msg): JuaError(msg){}
+    JuaTypeError(std::string msg): JuaError(msg, Kind::Type){}
     std::string toDebugString(){ return "JuaTypeError: " + message; }
+};
+struct JuaRangeError: JuaError{
+    JuaRangeError(std::string msg): JuaError(msg, Kind::Range){}
+    std::string toDebugString(){ return "JuaRangeError: " + message; }
+};
+struct JuaRefError: JuaError{
+    JuaRefError(std::string msg): JuaError(msg, Kind::Reference){}
+    std::string toDebugString(){ return "JuaRefError: " + message; }
 };
 
 }

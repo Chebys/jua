@@ -1,0 +1,20 @@
+// 错误模型：错误带分类（kind），try() 通过 errorKind 暴露
+let {eq, ok} = require 'harness'
+
+let c = try(fun(){ throw 'boom' })
+eq(c.status, false, 'user error status')
+eq(c.errorKind, 'client', 'throw() 产生的错误归为 client')
+ok(type(c.error) == 'string', 'error 仍是文本消息')
+
+let r = try(fun(){ null.missing })
+eq(r.errorKind, 'reference', '访问不存在的属性是 reference')
+
+let g = try(fun(){ undefinedName })
+eq(g.errorKind, 'reference', '未声明变量是 reference')
+
+let t = try(fun(){ 1 in 2 })
+eq(t.errorKind, 'type', '对数字做 in 是 type')
+
+let okr = try(fun(){ return 7 })
+eq(okr.status, true, '成功时 status 为 true')
+eq(Object.get(okr, 'errorKind'), null, '成功时没有 errorKind')

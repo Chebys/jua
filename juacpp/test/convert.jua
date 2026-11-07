@@ -1,5 +1,5 @@
 // 类型转换：ToBoolean 与 ToString（见 draft/抽象操作.md）
-let {eq, ok} = require 'harness'
+let {eq, ok, throws} = require 'harness'
 
 // ---- ToBoolean ----
 let t = fun(v){ return if(v) true else false }
@@ -27,7 +27,13 @@ eq(String([]), '[]', '空数组走原型 toString')
 eq(String([1, 2]), '[1, 2]', '数组走原型 toString')
 eq(String({}), '[object]', '普通对象默认 [object]')
 
-// ---- ToString：数字 ----
+// ---- ToString：对象的 toString 元方法定义在原型上 ----
+let K = class({name = 'K', toString(self){ return 'K:' + self.name }})
+eq(String(K()), 'K:K', '类的 toString 生效')
+
+let Bad = class({toString(self){ return 123 }})
+throws(fun(){ String(Bad()) }, 'toString 返回非字符串时抛出错误')
+
 eq(String(1), '1', '整数')
 eq(String(1.5), '1.5', '小数')
 eq(String(-1.5), '-1.5', '负数')

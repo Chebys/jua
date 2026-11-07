@@ -18,6 +18,14 @@ static void SetConsoleToUTF8(){
 #endif
 }
 
+// print 的转换由宿主决定（见 抽象操作.md），不必等于 ToString。
+// 官方实现：没有 toString 元方法的对象显示其键，便于调试。
+static std::string renderForPrint(Value* v){
+    if(v->type == Value::Obj && !v->getMetaMethod("toString"))
+        return v->safeToString();
+    return v->toString();
+}
+
 struct JuaRuntime: VM{
     const char* main; //主模块名称
     fs::path cwd;
@@ -115,10 +123,10 @@ struct JuaRuntime: VM{
     void j_stdout(const jualist& vals){
         size_t len = vals.size();
         if(!len)cout << '\n';
-        std::string str(vals[0]->toString());
+        std::string str(renderForPrint(vals[0]));
         for(size_t i=1; i<len; i++){
             str.push_back('\t');
-            str.append(vals[i]->toString());
+            str.append(renderForPrint(vals[i]));
         }
         cout << str << '\n';
     };

@@ -4,6 +4,11 @@ let {eq} = require 'harness'
 eq(123.456, 123.456, 'decimal')
 eq(0xfff, 4095, 'hex')
 eq(5e-2, 0.05, 'exponent')
+
+// 空数组/空对象字面量
+let empty = []
+eq(empty:len(), 0, 'empty array literal')
+eq(type({}), 'object', 'empty object literal')
 eq(-0.5, -0.5, 'negative')
 
 eq('abc\ndef':len(), 7, 'sq escape length')

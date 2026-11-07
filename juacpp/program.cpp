@@ -170,7 +170,7 @@ Value* ArrayExpr::calc(Scope* env){
     //构建过程中 arr 与已写入的元素都必须保活
     RootGuard guard(env->vm);
     env->vm->gcRoots.push_back(arr);
-    list->appendTo(env, arr->items); //避免复制
+    if(list)list->appendTo(env, arr->items); //避免复制；list 为空表示空数组字面量
     return arr;
 }
 Value* ObjExpr::calc(Scope* env){

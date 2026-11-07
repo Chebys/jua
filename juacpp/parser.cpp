@@ -671,9 +671,11 @@ Expr* parsePrimary(TokensReader& reader){
     case Token::BRACKET:{
         auto cl = static_cast<Enclosure*>(start);
         ArrayExpr* arr;
-        if(cl->reader.end())
-            arr = new ArrayExpr({});
-        else{
+        if(cl->reader.end()){
+            //注意不能写成 new ArrayExpr({})：那是把 nullptr 传给指针参数
+            std::vector<Expr*> none;
+            arr = new ArrayExpr(new FlexibleList(none));
+        }else{
             auto list = parseFlexExprList(cl->reader);
             cl->reader.assetEnd();
             arr = new ArrayExpr(list);

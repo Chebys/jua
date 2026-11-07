@@ -9,6 +9,16 @@ eq(arr:len(), 3, 'array trailing comma')
 let o = {x = 1, y = 2,}
 eq(o.y, 2, 'object trailing comma')
 
+// 参数表、调用、case 的表达式列表同样允许尾随逗号
+fun add2(a, b,){ return a + b }
+eq(add2(1, 2,), 3, 'trailing comma in params and call')
+fun pick(v){
+    switch(v)
+        case(1,) return 'one'
+        else return 'other'
+}
+eq(pick(1), 'one', 'trailing comma in case')
+
 let name = 'jua'
 let obj = {name, shout(self){ return self.name + '!' }}
 eq(obj:shout(), 'jua!', 'property and method shorthand')

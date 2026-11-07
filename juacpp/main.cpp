@@ -150,12 +150,16 @@ int main(int argc, char* argv[]){
         //无参数：REPL
         cout << "Jua REPL. Add ';' to end input. Type 'exit;' to quit.\n";
         JuaRuntime rt("<repl>");
+        //整个 REPL 会话共用一个作用域，上一行声明的变量下一行才能用。
+        //它是宿主长期持有的值，必须登记为 GC 根，否则会被回收。
+        auto replEnv = new Scope(rt._G);
+        rt.own(replEnv);
         while (true) {
             std::string input;
             if (!readInput(input)) break;
             if (input == "exit;") break;
             try{
-                rt.eval(input);
+                rt.evalIn(replEnv, input);
             }catch(JuaError* e){
                 rt.j_stderr(e);
                 delete e;

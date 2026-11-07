@@ -22,11 +22,13 @@ void VM::run(const string& script){
 }
 
 Value* VM::eval(const string& script){
+    //每次求值新建一个作用域：模块之间不共享局部变量
+    return evalIn(new Scope(_G), script);
+}
+Value* VM::evalIn(Scope* env, const string& script){
     //返回非空指针，可能需要垃圾回收
-    //d_log("eval");
-    //d_log(script);
     auto body = parse(script);
-    return body->exec(new Scope(_G));
+    return body->exec(env);
 }
 
 void VM::own(Value* value){

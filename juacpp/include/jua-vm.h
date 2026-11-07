@@ -47,7 +47,8 @@ namespace Jua {
         allValues.clear();
     }
     void run(const std::string&);
-    Value* eval(const std::string&); //不捕获错误
+    Value* eval(const std::string&); //新建一个作用域求值（模块用），不捕获错误
+    Value* evalIn(Scope* env, const std::string&); //在指定作用域中求值（REPL 用）
     void own(Value*); //宿主登记长期持有的值（GC 根）
 
     // GC 接口

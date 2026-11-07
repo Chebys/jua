@@ -382,6 +382,20 @@ Value* Scope::inheritProp(const string& key){
     return nullptr;
 }
 
+void Scope::assign(const string& key, Value* val){
+    //沿作用域链查找持有该变量的那个作用域。用 find 一次完成查找与写入，
+    //原先的 contains + setProp 会算两次哈希（浅层链路不明显，深层链路上是热点）。
+    for(auto scope = this; scope; scope = scope->parent){
+        auto it = scope->dict.find(key);
+        if(it != scope->dict.end()){
+            it->second = val;
+            return;
+        }
+    }
+    //必须抛 JuaError*：try() 只 catch 这种类型
+    throw new JuaRefError("Variable not found: " + key);
+}
+
 Array::Array(VM* vm, const jualist& list): Object(vm, vm->ArrayProto), items(list){}
 Value* Array::getItem(Value* key){
     size_t i = correctIndex(key, items.size());

@@ -208,15 +208,7 @@ struct Scope: Object{
     }
     Value* inheritProp(const std::string&) override;
     void trace(VM* vm) override;
-    void assign(const std::string& key, Value* val){
-        for(auto scope = this; scope; scope = scope->parent){
-            if(scope->dict.contains(key)){
-                scope->setProp(key, val);
-                return;
-            }
-        }
-        throw std::string("Variable not found: ") + key;
-    }
+    void assign(const std::string& key, Value* val); //定义在 value.cpp（需要完整的错误类型）
 };
 struct NativeFunction: Function{
     typedef std::function<Value*(jualist&)> Native; //可返回 nullptr

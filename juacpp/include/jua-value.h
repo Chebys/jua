@@ -120,13 +120,15 @@ struct Null: Value{
     Null(): Value(nullptr, Value::Null){}
 };
 struct Object: Value{
+    //若将来要做属性查找优化，方向是「解析期驻留标识符 + 指针键」，
+    //而不是缓存字符串哈希：std::unordered_map 不接受预计算哈希。
     std::unordered_map<std::string, Value*> dict;
     Object(VM* vm_, Object* p = nullptr);
     bool hasOwn(Value* key);
-    Value* getOwn(size_t hash, const std::string& key); //todo
     Value* getOwn(const std::string& key){
-        if(dict.contains(key))return dict[key];
-        return nullptr;
+        //一次 find 就够：contains + operator[] 会算两次哈希，这是属性访问热路径
+        auto it = dict.find(key);
+        return it == dict.end() ? nullptr : it->second;
     }
     Value* getOwn(const char* key){
         std::string str(key);

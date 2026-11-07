@@ -9,22 +9,24 @@ namespace Jua {
     std::unordered_map<std::string, Value*> modules;
     std::unordered_set<Value*> ownedValues; //宿主长期持有的值，作为 GC 根
 
-    Scope* _G;
-    Object* classProto;
-    Object* StringProto;
-    Object* NumberProto;
-    Object* BooleanProto;
-    Object* FunctionProto;
-    Object* ObjectProto;
-    Object* ArrayProto;
-    Object* BufferProto;
-    Object* RangeProto;
-    Object* ErrorProto;
-    Object* TryResProto;
+    //全部指针成员都必须初始化：任何未初始化的成员被当作 GC 根时，
+    //都会让标记阶段去解引用栈上的垃圾值（历史 bug，见 改进清单 附C #16）
+    Scope* _G = nullptr;
+    Object* classProto = nullptr;
+    Object* StringProto = nullptr;
+    Object* NumberProto = nullptr;
+    Object* BooleanProto = nullptr;
+    Object* FunctionProto = nullptr;
+    Object* ObjectProto = nullptr;
+    Object* ArrayProto = nullptr;
+    Object* BufferProto = nullptr;
+    Object* RangeProto = nullptr;
+    Object* ErrorProto = nullptr;
+    Object* TryResProto = nullptr;
 
-    NativeFunction* obj_new;
-    NativeFunction* obj_hasOwn;
-    NativeFunction* obj_next;
+    NativeFunction* obj_new = nullptr;
+    NativeFunction* obj_hasOwn = nullptr;
+    NativeFunction* obj_next = nullptr;
 
     // ---- 垃圾回收（非移动标记-清除，见 gc.cpp） ----
     std::unordered_set<Value*> allValues; //所有由本 VM 分配、受回收管理的值
@@ -35,6 +37,8 @@ namespace Jua {
     size_t freedCount = 0;                //累计回收的值个数（诊断用）
     bool gcPending = false;
     bool collecting = false;
+    Value* traceParent = nullptr; //诊断用：当前正在遍历的值
+    const char* rootTag = nullptr; //诊断用：当前正在标记的根
 
     VM();
     virtual ~VM(){

@@ -33,6 +33,13 @@ let o = {v = 1}
 o.v += 2
 eq(o.v, 3, 'property compound assign')
 
+let m = 7
+m %= 4
+eq(m, 3, 'modulo compound assign')
+let o2 = {v = 9}
+o2.v %= 4
+eq(o2.v, 1, 'property modulo compound assign')
+
 let obj = {name = 'jua', meth(self, n){ return self.name + n }}
 eq(obj:meth('!'), 'jua!', 'method wrapper')
 let bound = obj:meth

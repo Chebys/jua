@@ -51,7 +51,7 @@ static CharSet sepchars = [](){
         sepchars.set(c);
     return sepchars;
 }();
-static StrSet assigners{"=", "+=", "-=", "*=", "/=", "&&=", "||="};
+static StrSet assigners{"=", "+=", "-=", "*=", "/=", "%=", "&&=", "||="};
 static StrSet seprators = [](){
     StrSet seprators(assigners);
     for(char c: _sepchars)

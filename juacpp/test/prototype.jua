@@ -25,3 +25,21 @@ eq(s1, 6, 'custom iterator first pass')
 let s2 = 0
 for(v in rg) s2 += v
 eq(s2, 6, 'custom iterator is reusable')
+
+// 有状态迭代器同样合法：不返回 key，进度记在自身，因此只能迭代一次
+let Counter = class({
+    init(self, n){ self.n = n; self.i = 0 },
+    next(self){
+        if(self.i >= self.n) return {done = true}
+        self.i += 1
+        return {done = false, value = self.i}
+    }
+})
+let total = fun(c){
+    let sum = 0
+    for(v in c) sum += v
+    return sum
+}
+let c = Counter(3)
+eq(total(c), 6, 'stateful iterator first pass')
+eq(total(c), 0, 'stateful iterator is exhausted, which is legal')

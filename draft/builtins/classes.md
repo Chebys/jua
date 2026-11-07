@@ -67,7 +67,7 @@ return Number.range(self, end, 1)
 
 ### Number.isInt(num)
 ### 编解码函数
-所有编码函数以 Number.encodeXXX 命名，解码函数以 Number.decodeXXX 命名，其中。。。
+所有编码函数以 `Number.encodeXXX` 命名，解码函数以 `Number.decodeXXX` 命名，其中 `XXX` 是编码名称。
 ### Number.parse(str)
 
 ## String

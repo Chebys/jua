@@ -133,34 +133,47 @@ Value* Value::unm(){
     if(fn)return fn->call({this});
     throw new JuaTypeError("Object is not unary negatable");
 }
+// 二元运算在左操作数上没有可用语义时，回退到右操作数的元方法。
+// 见 draft/词法.md「元方法」：二元运算符重载优先使用左操作数的元方法。
+static Value* byRightMeta(Value* left, Value* right, const char* name){
+    auto fn = right->getMetaMethod(name);
+    if(fn)return fn->call({left, right});
+    return nullptr;
+}
 Value* Value::add(Value* val){
     Function* fn = getMetaMethod("__add");
     if(fn)return fn->call({this, val});
+    if(auto r = byRightMeta(this, val, "__add"))return r;
     throw new JuaTypeError("Object is not addable");
 }
 Value* Value::mod(Value* val){
     Function* fn = getMetaMethod("__mod");
     if(fn)return fn->call({this, val});
+    if(auto r = byRightMeta(this, val, "__mod"))return r;
     throw new JuaTypeError("Object is not modulo-able");
 }
 Value* Value::pow(Value* val){
     Function* fn = getMetaMethod("__pow");
     if(fn)return fn->call({this, val});
+    if(auto r = byRightMeta(this, val, "__pow"))return r;
     throw new JuaTypeError("Object is not exponentiable");
 }
 Value* Value::sub(Value* val){
     Function* fn = getMetaMethod("__sub");
     if(fn)return fn->call({this, val});
+    if(auto r = byRightMeta(this, val, "__sub"))return r;
     throw new JuaTypeError("Object is not subtractable");
 }
 Value* Value::mul(Value* val){
     Function* fn = getMetaMethod("__mul");
     if(fn)return fn->call({this, val});
+    if(auto r = byRightMeta(this, val, "__mul"))return r;
     throw new JuaTypeError("Object is not multiplicable");
 }
 Value* Value::div(Value* val){
     Function* fn = getMetaMethod("__div");
     if(fn)return fn->call({this, val});
+    if(auto r = byRightMeta(this, val, "__div"))return r;
     throw new JuaTypeError("Object is not dividable");
 }
 Boolean* Value::eq(Value* val){
@@ -169,16 +182,19 @@ Boolean* Value::eq(Value* val){
 Boolean* Value::lt(Value* val){
     Function* fn = getMetaMethod("__lt");
     if(fn)return fn->call({this, val})->toJuaBool();
+    if(auto r = byRightMeta(this, val, "__lt"))return r->toJuaBool();
     throw new JuaTypeError("Object is not comparable");
 }
 Boolean* Value::le(Value* val){
     Function* fn = getMetaMethod("__le");
     if(fn)return fn->call({this, val})->toJuaBool();
+    if(auto r = byRightMeta(this, val, "__le"))return r->toJuaBool();
     throw new JuaTypeError("Object is not comparable");
 }
 Value* Value::range(Value* val){
     Function* fn = getMetaMethod("__range");
     if(fn)return fn->call({this, val});
+    if(auto r = byRightMeta(this, val, "__range"))return r;
     throw new JuaTypeError("Object is not rangeable");
 }
 bool Value::operator==(Value* val){
@@ -295,47 +311,74 @@ Value* Number::unm(){
     return new Number(vm, -value);
 }
 Value* Number::add(Value* val){
-    if(val->type!=Num)throw new JuaTypeError("try to add non-number");
+    if(val->type!=Num){
+        if(auto r = byRightMeta(this, val, "__add"))return r;
+        throw new JuaTypeError("try to add non-number");
+    }
     auto num = static_cast<Number*>(val);
     return new Number(vm, value + num->value);
 }
 Value* Number::sub(Value* val){
-    if(val->type!=Num)throw new JuaTypeError("try to sub non-number");
+    if(val->type!=Num){
+        if(auto r = byRightMeta(this, val, "__sub"))return r;
+        throw new JuaTypeError("try to sub non-number");
+    }
     auto num = static_cast<Number*>(val);
     return new Number(vm, value - num->value);
 }
 Value* Number::mul(Value* val){
-    if(val->type!=Num)throw new JuaTypeError("try to mul non-number");
+    if(val->type!=Num){
+        if(auto r = byRightMeta(this, val, "__mul"))return r;
+        throw new JuaTypeError("try to mul non-number");
+    }
     auto num = static_cast<Number*>(val);
     return new Number(vm, value * num->value);
 }
 Value* Number::div(Value* val){
-    if(val->type!=Num)throw new JuaTypeError("try to div non-number");
+    if(val->type!=Num){
+        if(auto r = byRightMeta(this, val, "__div"))return r;
+        throw new JuaTypeError("try to div non-number");
+    }
     auto num = static_cast<Number*>(val);
     return new Number(vm, value / num->value);
 }
 Value* Number::mod(Value* val){
-    if(val->type!=Num)throw new JuaTypeError("try to mod non-number");
+    if(val->type!=Num){
+        if(auto r = byRightMeta(this, val, "__mod"))return r;
+        throw new JuaTypeError("try to mod non-number");
+    }
     auto num = static_cast<Number*>(val);
     return new Number(vm, std::fmod(value, num->value));
 }
 Value* Number::pow(Value* val){
-    if(val->type!=Num)throw new JuaTypeError("try to pow non-number");
+    if(val->type!=Num){
+        if(auto r = byRightMeta(this, val, "__pow"))return r;
+        throw new JuaTypeError("try to pow non-number");
+    }
     auto num = static_cast<Number*>(val);
     return new Number(vm, std::pow(value, num->value));
 }
 Boolean* Number::lt(Value* val){
-    if(val->type!=Num)throw new JuaTypeError("try to compare non-number");
+    if(val->type!=Num){
+        if(auto r = byRightMeta(this, val, "__lt"))return r->toJuaBool();
+        throw new JuaTypeError("try to compare non-number");
+    }
     auto num = static_cast<Number*>(val);
     return Boolean::getInst(value < num->value);
 }
 Boolean* Number::le(Value* val){
-    if(val->type!=Num)throw new JuaTypeError("try to compare non-number");
+    if(val->type!=Num){
+        if(auto r = byRightMeta(this, val, "__le"))return r->toJuaBool();
+        throw new JuaTypeError("try to compare non-number");
+    }
     auto num = static_cast<Number*>(val);
     return Boolean::getInst(value <= num->value);
 }
 Value* Number::range(Value* val){
-    if(val->type!=Num)throw new JuaTypeError("try to create range with non-number");
+    if(val->type!=Num){
+        if(auto r = byRightMeta(this, val, "__range"))return r;
+        throw new JuaTypeError("try to create range with non-number");
+    }
     auto num = static_cast<Number*>(val);
     auto range = new Object(vm, vm->RangeProto);
     range->setProp("start", new Number(vm, value));
@@ -404,7 +447,10 @@ Value* String::getItem(Value* key){
     return new String(vm, string(1, value[i]));
 }
 Value* String::add(Value* val){
-    if(val->type!=Str)throw new JuaTypeError("try to add non-string");
+    if(val->type!=Str){
+        if(auto r = byRightMeta(this, val, "__add"))return r;
+        throw new JuaTypeError("try to add non-string");
+    }
     auto str = static_cast<String*>(val);
     return new String(vm, value + str->value);
 }

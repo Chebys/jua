@@ -1,5 +1,5 @@
 // 表达式：优先级、赋值、复合赋值、方法包装、可选访问
-let {eq, ok} = require 'harness'
+let {eq, ok, throws} = require 'harness'
 
 eq(-1 + 2 * (3 - 4), -3, 'precedence')
 eq(10 / 4, 2.5, 'division is float')
@@ -38,3 +38,13 @@ eq(obj:meth('!'), 'jua!', 'method wrapper')
 let bound = obj:meth
 eq(bound('?'), 'jua?', 'method wrapper escapes')
 eq(obj?.missing, null, 'optional prop')
+
+// 二元运算：先左操作数的元方法，再右操作数的
+let Adder = class({__add(self, o){ return 'added' }})
+eq(Adder() + 1, 'added', '左操作数的 __add')
+eq(1 + Adder(), 'added', '回退到右操作数的 __add')
+eq('s' + Adder(), 'added', '字符串 + 对象也回退')
+throws(fun(){ 1 - Adder() }, '没有 __sub 时仍然报错')
+
+let Less = class({__lt(self, o){ return true }})
+eq(1 < Less(), true, '回退到右操作数的 __lt')

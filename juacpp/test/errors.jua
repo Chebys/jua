@@ -1,25 +1,25 @@
-// 错误模型：错误带分类（kind），try() 通过 errorKind 暴露
+// 错误模型：错误带分类（kind），try 通过 errorKind 暴露
 let {eq, ok} = require 'harness'
 
-let c = try(fun(){ throw 'boom' })
+let c = try{ throw 'boom' }
 eq(c.status, false, 'user error status')
-eq(c.errorKind, 'client', 'throw() 产生的错误归为 client')
+eq(c.errorKind, 'client', 'throw 产生的错误归为 client')
 ok(type(c.error) == 'string', 'error 仍是文本消息')
 
-let r = try(fun(){ null.missing })
+let r = try{ null.missing }
 eq(r.errorKind, 'reference', '访问不存在的属性是 reference')
 
-let g = try(fun(){ undefinedName })
+let g = try{ undefinedName }
 eq(g.errorKind, 'reference', '未声明变量是 reference')
 
-// 给未声明的变量赋值：以前抛 std::string，try() 接不住，会直接终止程序
-let a = try(fun(){ notDeclared = 1 })
+// 给未声明的变量赋值：以前抛 std::string，try 接不住，会直接终止程序
+let a = try{ notDeclared = 1 }
 eq(a.status, false, '给未声明变量赋值会失败')
 eq(a.errorKind, 'reference', '该错误是 reference')
 
-let t = try(fun(){ 1 in 2 })
+let t = try{ 1 in 2 }
 eq(t.errorKind, 'type', '对数字做 in 是 type')
 
-let okr = try(fun(){ return 7 })
+let okr = try{ return 7 }
 eq(okr.status, true, '成功时 status 为 true')
 eq(Object.get(okr, 'errorKind'), null, '成功时没有 errorKind')

@@ -1,6 +1,12 @@
 // 语句：if/while/for/switch 与 break/continue/return
 let {eq} = require 'harness'
 
+// 解构数组
+let [dx, dy] = [3, 4]
+eq(dx + dy, 7, 'array destructuring')
+let [p, q,] = [1, 2]
+eq(q, 2, 'array destructuring with trailing comma')
+
 fun grade(n){
     if(n >= 90) return 'A'
     else if(n >= 60) return 'B'

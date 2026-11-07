@@ -29,6 +29,13 @@ eq("n=$n", 'n=42', 'interp word')
 eq("n=${n + 1}", 'n=43', 'interp expr')
 eq("${'a'}${'b'}", 'ab', 'interp adjacent')
 
+// 字符串模板的 ${ } 配对由词元扫描确定：嵌套括号、字符串里的 }、注释里的 } 都不终止插值
+eq("${ {a = 1} }", '[object]', 'nested braces do not end the interpolation')
+eq("${ '}' }", '}', 'a brace inside a string does not end the interpolation')
+eq("${ 1 /* } */ + 1 }", '2', 'a brace inside a comment does not end the interpolation')
+eq("outer=${ "inner=${2}" }", 'outer=inner=2', 'nested template')
+eq("dollar=${'$'}", 'dollar=$', 'a literal dollar sign needs an interpolation')
+
 // 转义：\0 只表示 U+0000；\x 直接给字节；\u 按 utf8 编码
 eq('\0':len(), 1, 'NUL is one byte')
 eq('\0':byte(0), 0, 'NUL is U+0000')

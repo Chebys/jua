@@ -1,0 +1,4 @@
+// expect-error: Invalid char
+// $ 之后必须紧跟单词或 {，否则为语法错误。见 draft/词法.md「双引号字符串」。
+
+let s = "a$"

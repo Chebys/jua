@@ -265,9 +265,13 @@ void Object::assignProps(Object* obj){
     }
 }
 string Object::toString(){
+    //见 draft/抽象操作.md「对象转字符串」
     auto fn = getMetaMethod("toString");
-    if(fn)return fn->call({this})->toString();
-    return safeToString();
+    if(!fn)return "[object]";
+    Value* r = fn->call({this});
+    if(r->type != Str)
+        throw new JuaTypeError("toString must return a string");
+    return static_cast<String*>(r)->value;
 }
 string Object::safeToString(){
     if(dict.empty())return "{}";
@@ -344,10 +348,43 @@ bool Number::operator==(Value* val){
         return false;
     return value == static_cast<Number*>(val)->value;
 }
+// 按 draft/抽象操作.md「数字转字符串」的规则格式化：最短往返 + 阈值切换
+static string formatNumber(double x){
+    if(std::isnan(x))return "NaN";
+    if(std::isinf(x))return x > 0 ? "Infinity" : "-Infinity";
+    if(x == 0)return "0"; //含 -0
+    bool neg = x < 0;
+    if(neg)x = -x;
+
+    //先取最短往返的科学计数法，再把指数与有效数字拆出来
+    char buf[64];
+    auto res = std::to_chars(buf, buf + sizeof(buf), x, std::chars_format::scientific);
+    string sci(buf, res.ptr);
+    auto epos = sci.find('e');
+    string mant = sci.substr(0, epos);
+    int exp10 = std::stoi(sci.substr(epos + 1));
+    string digits;
+    for(char c: mant)if(c != '.')digits.push_back(c);
+    while(digits.size() > 1 && digits.back() == '0')digits.pop_back();
+
+    int k = (int)digits.size();
+    int n = exp10 + 1; // x = 0.digits × 10^n
+    string out;
+    if(k <= n && n <= 21){
+        out = digits + string(n - k, '0');
+    }else if(0 < n && n <= 21){
+        out = digits.substr(0, n) + "." + digits.substr(n);
+    }else if(-6 < n && n <= 0){
+        out = "0." + string(-n, '0') + digits;
+    }else{
+        string m = (k == 1) ? digits : digits.substr(0, 1) + "." + digits.substr(1);
+        int e = n - 1;
+        out = m + "e" + (e < 0 ? "-" : "+") + std::to_string(e < 0 ? -e : e);
+    }
+    return neg ? "-" + out : out;
+}
 string Number::toString(){
-    char s[64];
-    auto res = std::to_chars(s, s+64, value);
-    return {s, res.ptr};
+    return formatNumber(value);
 }
 
 size_t correctIndex(Value* num, size_t len){

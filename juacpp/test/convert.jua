@@ -1,0 +1,48 @@
+// 类型转换：ToBoolean 与 ToString（见 draft/抽象操作.md）
+let {eq, ok} = require 'harness'
+
+// ---- ToBoolean ----
+let t = fun(v){ return if(v) true else false }
+eq(t(null), false, 'null 为假')
+eq(t(false), false, 'false 为假')
+eq(t(0), false, '0 为假')
+eq(t(-0), false, '-0 为假')
+eq(t(0 / 0), false, 'NaN 为假')
+eq(t(''), false, '空串为假')
+eq(t(true), true, 'true 为真')
+eq(t(1), true, '1 为真')
+eq(t(-1), true, '-1 为真')
+eq(t('0'), true, '字符串 "0" 为真')
+eq(t({}), true, '空对象为真')
+eq(t([]), true, '空数组为真')
+eq(t(fun(){}), true, '函数为真')
+
+// ---- ToString：基本类型 ----
+eq(String(null), 'null', 'null')
+eq(String(true), 'true', 'true')
+eq(String(false), 'false', 'false')
+eq(String('abc'), 'abc', '字符串原样')
+eq(type(String(fun(){})), 'string', '函数转字符串')
+eq(String([]), '[]', '空数组走原型 toString')
+eq(String([1, 2]), '[1, 2]', '数组走原型 toString')
+eq(String({}), '[object]', '普通对象默认 [object]')
+
+// ---- ToString：数字 ----
+eq(String(1), '1', '整数')
+eq(String(1.5), '1.5', '小数')
+eq(String(-1.5), '-1.5', '负数')
+eq(String(-0), '0', '-0 输出 0')
+eq(String(1 / 0), 'Infinity', '正无穷')
+eq(String(-1 / 0), '-Infinity', '负无穷')
+eq(String(0 / 0), 'NaN', 'NaN')
+eq(String(0.1 + 0.2), '0.30000000000000004', '最短往返')
+eq(String(100), '100', '三位整数')
+eq(String(1e20), '100000000000000000000', '1e20 用定点')
+eq(String(1e21), '1e+21', '1e21 用指数')
+eq(String(1e-6), '0.000001', '1e-6 用定点')
+eq(String(1e-7), '1e-7', '1e-7 用指数')
+eq(String(123456789012345678901), '123456789012345680000', '最短有效数字')
+eq(String(1.5e30), '1.5e+30', '带小数部分的指数形式')
+
+// 往返：转回数字应当相等
+eq(Number(String(0.1 + 0.2)), 0.1 + 0.2, '数字转字符串再转回仍相等')

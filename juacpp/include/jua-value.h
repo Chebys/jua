@@ -176,7 +176,8 @@ struct Number: Value{
     Value* range(Value*);
     bool operator==(Value* val);
     std::string toString();
-    bool toBoolean(){ return value; }
+    //注意 NaN：(bool)NaN 在 C++ 里是 true，但规范要求 NaN 为假
+    bool toBoolean(){ return value != 0 && !std::isnan(value); }
     int64_t toInt(){ return std::llround(value); }
     double toNumber(){ return value; }
     std::string getTypeName(){ return "number"; }

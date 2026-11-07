@@ -7,6 +7,8 @@ namespace Jua {
 void d_log(const string& msg){
     #ifdef JUA_DEBUG
     std::cout << msg << '\n';
+    #else
+    (void)msg; //未定义 JUA_DEBUG 时参数不被使用
     #endif
 }
 void d_log(char c){

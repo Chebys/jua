@@ -43,7 +43,7 @@ struct Value{
     bool marked = false; //GC 标记位
     Value(VM* vm_, JuaType t, Object* p = nullptr);
     virtual ~Value() = default;
-    virtual bool isType(int type_id){
+    virtual bool isType(int){
         //用于自定义类型判断（自定义类型应当是 Object 的子类）
         //保留的 type_id:
         // 0: 未使用
@@ -55,8 +55,8 @@ struct Value{
         return false;
     }
     //把本值持有的所有强引用交给 GC。只在标记阶段调用。
-    virtual void trace(VM* vm){}
-    virtual Value* getOwn(const std::string& key){
+    virtual void trace(VM*){}
+    virtual Value* getOwn(const std::string&){
         return nullptr;
     }
     Value* getOwn(const char* key){
@@ -85,6 +85,8 @@ struct Value{
     }
     virtual Value* unm();
     virtual Value* add(Value*);
+    virtual Value* mod(Value*); // %
+    virtual Value* pow(Value*); // ^
     virtual Value* sub(Value*);
     virtual Value* mul(Value*);
     virtual Value* div(Value*);
@@ -165,6 +167,8 @@ struct Number: Value{
     Value* sub(Value*);
     Value* mul(Value*);
     Value* div(Value*);
+    Value* mod(Value*);
+    Value* pow(Value*);
     Boolean* lt(Value*);
     Boolean* le(Value*);
     Value* range(Value*);
@@ -274,7 +278,7 @@ struct JuaIterator{
     virtual ~JuaIterator() = default;
     virtual Value* next() = 0; //迭代完成时返回 nullptr
     //把自己当前持有的值登记进 GC 根集合（在 next() 之前调用）
-    virtual void rootValues(VM* vm){}
+    virtual void rootValues(VM*){} //把自己当前持有的值压入 VM::gcRoots
 };
 // Jua 错误。所有抛出点都必须抛指针（JuaError*）：宿主与 try() 只 catch 指针，
 // 按值抛出会落到 catch(...) 并丢失消息（历史 bug，见 改进清单 附C #12）。

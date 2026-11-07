@@ -310,7 +310,7 @@ struct JuaSyntaxError: JuaError{
     JuaSyntaxError(const std::string& msg, size_t p, size_t l, size_t c):
         JuaError(msg), pos(p), line(l), col(c){}
     std::string toDebugString() override {
-        if(pos == -1) return std::format("JuaSyntaxError: {}", message);
+        if(pos == (size_t)-1) return std::format("JuaSyntaxError: {}", message);
         return std::format("JuaSyntaxError: {} at {}:{}", message, line, col);
     }
 };

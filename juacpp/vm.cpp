@@ -216,7 +216,7 @@ Object* VM::makeRangeProto(){
             throw new JuaError("Range.next() called on a non-object");
         }
         auto key = args[1];
-        size_t index;
+        int64_t index;
         if(key->type == Value::Num){
             auto step = self->getProp("step");
             if(!step || step->type != Value::Num)
@@ -519,7 +519,7 @@ Object* VM::makeObjectProto(){
         if(self->type != Value::Obj && self->type != Value::Func){
             throw new JuaError("Object.id() expected an object or function");
         }
-        if(self->id == -1){
+        if(self->id == (size_t)-1){
             self->id = ++idcounter; // 分配一个唯一的 ID
         }
         return new Number(self->vm, self->id);

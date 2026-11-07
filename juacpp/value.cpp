@@ -138,6 +138,16 @@ Value* Value::add(Value* val){
     if(fn)return fn->call({this, val});
     throw new JuaTypeError("Object is not addable");
 }
+Value* Value::mod(Value* val){
+    Function* fn = getMetaMethod("__mod");
+    if(fn)return fn->call({this, val});
+    throw new JuaTypeError("Object is not modulo-able");
+}
+Value* Value::pow(Value* val){
+    Function* fn = getMetaMethod("__pow");
+    if(fn)return fn->call({this, val});
+    throw new JuaTypeError("Object is not exponentiable");
+}
 Value* Value::sub(Value* val){
     Function* fn = getMetaMethod("__sub");
     if(fn)return fn->call({this, val});
@@ -300,6 +310,16 @@ Value* Number::div(Value* val){
     auto num = static_cast<Number*>(val);
     return new Number(vm, value / num->value);
 }
+Value* Number::mod(Value* val){
+    if(val->type!=Num)throw new JuaTypeError("try to mod non-number");
+    auto num = static_cast<Number*>(val);
+    return new Number(vm, std::fmod(value, num->value));
+}
+Value* Number::pow(Value* val){
+    if(val->type!=Num)throw new JuaTypeError("try to pow non-number");
+    auto num = static_cast<Number*>(val);
+    return new Number(vm, std::pow(value, num->value));
+}
 Boolean* Number::lt(Value* val){
     if(val->type!=Num)throw new JuaTypeError("try to compare non-number");
     auto num = static_cast<Number*>(val);
@@ -371,7 +391,7 @@ void Array::setItem(Value* key, Value* val){
     size_t i = correctIndex(key, items.size());
     items[i] = val;
 }
-JuaIterator* Array::getIterator(Function* next){
+JuaIterator* Array::getIterator(Function*){
     return new ListIterator(items);
 }
 

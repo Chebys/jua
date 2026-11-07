@@ -81,6 +81,8 @@ inline Value* operate(BinOper type, Value* left, Value* right){
         case BinOper::sub: return left->sub(right);
         case BinOper::mul: return left->mul(right);
         case BinOper::div: return left->div(right);
+        case BinOper::mod: return left->mod(right);
+        case BinOper::pow: return left->pow(right);
         case BinOper::range: return left->range(right);
         case BinOper::lt: return left->lt(right);
         case BinOper::le: return left->le(right);
@@ -90,7 +92,10 @@ inline Value* operate(BinOper type, Value* left, Value* right){
         case BinOper::ne: return Boolean::getInst(!(*left == right));
         case BinOper::in: return right->hasItem(left);
         case BinOper::is: return Boolean::getInst(left->isInst(right));
+        case BinOper::and_:
+        case BinOper::or_:
+            //短路运算在 BinaryExpr / OperAssignment 中处理，不应走到这里
+            throw new JuaError("internal: logical operator reached operate()");
     }
-    d_log(int(type));
     throw new JuaError("unimplemented binary operator");
 }

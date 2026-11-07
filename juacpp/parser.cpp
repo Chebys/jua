@@ -86,10 +86,10 @@ namespace JuaParser{
     static bool _ = initSym();
 }
 bool validWordStart(char c){
-    return 'a'<=c && c<='z' || 'A'<=c && c<='Z' || c=='_';
+    return ('a'<=c && c<='z') || ('A'<=c && c<='Z') || c=='_';
 }
 bool isHex(char c){
-    return '0'<=c && c<='9' || 'a'<=c && c<='f' || 'A'<=c && c<='F';
+    return ('0'<=c && c<='9') || ('a'<=c && c<='f') || ('A'<=c && c<='F');
 }
 int hexVal(char c){
     if('0'<=c && c<='9')return c-'0';

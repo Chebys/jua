@@ -3,6 +3,10 @@ let {eq, ok} = require 'harness'
 
 eq(-1 + 2 * (3 - 4), -3, 'precedence')
 eq(10 / 4, 2.5, 'division is float')
+eq(7 % 4, 3, 'modulo')
+eq(-7 % 4, -3, 'modulo keeps the dividend sign (fmod)')
+eq(2 ^ 10, 1024, 'power')
+eq(2 ^ 0.5 > 1.414 && 2 ^ 0.5 < 1.415, true, 'fractional power')
 ok(1 < 2 && 3 > 2, 'logical and')
 ok(false || true, 'logical or')
 eq(!(1 > 2), true, 'not')

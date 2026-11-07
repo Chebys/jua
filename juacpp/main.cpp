@@ -26,13 +26,13 @@ struct JuaRuntime: VM{
         auto api = new Object(this);
         api->setProp("version", new String(this, "JuaRuntime 0.1"));
         //GC 诊断接口（宿主 API，不属于语言）
-        api->setProp("collect", makeFunc([this](jualist& args){
+        api->setProp("collect", makeFunc([this](jualist&){
             return new Number(this, (double)collect());
         }));
-        api->setProp("liveValues", makeFunc([this](jualist& args){
+        api->setProp("liveValues", makeFunc([this](jualist&){
             return new Number(this, (double)liveCount());
         }));
-        api->setProp("gcStats", makeFunc([this](jualist& args){
+        api->setProp("gcStats", makeFunc([this](jualist&){
             auto stats = new Object(this);
             stats->setProp("collections", new Number(this, (double)collectedCount));
             stats->setProp("freed", new Number(this, (double)freedCount));

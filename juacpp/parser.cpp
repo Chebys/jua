@@ -296,34 +296,44 @@ struct ScriptReader: TokensReader{
     }
     string readNum(char start){
         string num(1, start);
-        if(eof())return num;
-        if(start=='0' && script[pos]=='x'){
-            num.push_back('x');
-            forward();
-            while(!eof()){
-                char next = script[pos];
-                if(isHex(next)){
+        //进制前缀：0x 0b 0o（大小写均可），之后至少要有一位数字
+        if(start=='0' && !eof()){
+            char p = script[pos];
+            if(p=='x' || p=='X' || p=='b' || p=='B' || p=='o' || p=='O'){
+                num.push_back(p);
+                forward();
+                size_t begin = num.size();
+                while(!eof()){
+                    char next = script[pos];
+                    bool ok = (p=='x' || p=='X') ? isHex(next)
+                            : (p=='b' || p=='B') ? (next=='0' || next=='1')
+                            : (next >= '0' && next <= '7');
+                    if(!ok)break;
                     forward();
                     num.push_back(next);
                 }
-                else break;
+                if(num.size() == begin)
+                    throwError("invalid number literal: no digits after the base prefix");
+                return num;
             }
-            return num;
         }
         if(readSimpleNum(num))return num;
-        //此时非eof
+        //小数部分
         if(script[pos]=='.' && pos+1<script.size() && testChar(numChars, script[pos+1])){
             num.push_back('.');
             forward();
             if(readSimpleNum(num))return num;
         }
-        //此时非eof
-        if(script[pos]=='e'){
-            num.push_back('e');
+        //指数部分
+        if(script[pos]=='e' || script[pos]=='E'){
+            num.push_back(script[pos]);
             forward();
-            char next = readChar();
-            if(next=='-' || testChar(numChars, next))num.push_back(next);
-            else throwError("Invalid number: expected '-' or digit after 'e'");
+            if(!eof() && (script[pos]=='+' || script[pos]=='-')){
+                num.push_back(script[pos]);
+                forward();
+            }
+            if(eof() || !testChar(numChars, script[pos]))
+                throwError("invalid number literal: no digits in the exponent");
             readSimpleNum(num);
         }
         return num;

@@ -1,0 +1,4 @@
+// expect-error: no digits after the base prefix
+// 进制前缀后至少要有一位数字。见 draft/词法.md「字面数字」。
+
+let x = 0x

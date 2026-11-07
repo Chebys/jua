@@ -14,7 +14,17 @@ Value* Template::calc(Scope* env){
     return new String(env->vm, str);
 }
 LiteralNum* LiteralNum::eval(const string& str){
-    return new LiteralNum(std::stod(str));
+    //0b / 0o 不在 strtod 的接受范围内，需要自己累加；十进制与 0x 前缀交给 stod
+    double v = 0;
+    bool prefixed = str.size() > 2 && str[0] == '0';
+    if(prefixed && (str[1]=='b' || str[1]=='B')){
+        for(size_t i=2; i<str.size(); i++)v = v * 2 + (str[i] - '0');
+    }else if(prefixed && (str[1]=='o' || str[1]=='O')){
+        for(size_t i=2; i<str.size(); i++)v = v * 8 + (str[i] - '0');
+    }else{
+        v = std::stod(str);
+    }
+    return new LiteralNum(v);
 }
 Value* LiteralNum::calc(Scope* env){
     return new Number(env->vm, value);

@@ -3,7 +3,15 @@ let {eq} = require 'harness'
 
 eq(123.456, 123.456, 'decimal')
 eq(0xfff, 4095, 'hex')
+eq(0Xff, 255, 'uppercase hex prefix')
+eq(0b1010, 10, 'binary')
+eq(0B11, 3, 'uppercase binary prefix')
+eq(0o17, 15, 'octal')
+eq(0O10, 8, 'uppercase octal prefix')
 eq(5e-2, 0.05, 'exponent')
+eq(1e2, 100, 'exponent without sign')
+eq(1e+2, 100, 'exponent with plus')
+eq(1E2, 100, 'uppercase E')
 
 // 空数组/空对象字面量
 let empty = []

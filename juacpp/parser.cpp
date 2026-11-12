@@ -98,7 +98,7 @@ int hexVal(char c){
     return -1; //不是十六进制数字
 }
 
-JuaSyntaxError* missing(char c){
+JuaSyntaxError* missing(char c, bool incomplete=false){
     string msg;
     if(c=='\''){
         msg = "Missing \"'\"";
@@ -107,7 +107,7 @@ JuaSyntaxError* missing(char c){
         msg.push_back(c);
         msg.push_back('\'');
     }
-    return new JuaSyntaxError(msg, -1, -1, -1);
+    return new JuaSyntaxError(msg, -1, -1, -1, incomplete);
 }
 JuaSyntaxError* unexpected(string str){
     string msg = "Unexpected \"";
@@ -184,7 +184,7 @@ struct ListReader: TokensReader{
         pos = 0;
     }
     Token* read(){
-        if(pos >= tokens.size())throw new JuaSyntaxError("Unfinished input", -1, -1, -1);
+        if(pos >= tokens.size())throw new JuaSyntaxError("Unfinished input", -1, -1, -1, true);
         return tokens[pos++];
     }
     Token* preview(){
@@ -225,13 +225,13 @@ struct ScriptReader: TokensReader{
     Token* read();
     Token* preview();
     private:
-    [[noreturn]] void throwError(const string& msg){
+    [[noreturn]] void throwError(const string& msg, bool incomplete=false){
         //d_log(msg);
         //必须抛指针：宿主与 try() 都只 catch JuaError*
-        throw new JuaSyntaxError(msg, pos, line, col);
+        throw new JuaSyntaxError(msg, pos, line, col, incomplete);
     }
     char readChar(){
-        if(eof())throwError("Unfinished input");
+        if(eof())throwError("Unfinished input", true);
         char c = script[pos];
         forward(c=='\n');
         return c;
@@ -343,7 +343,7 @@ struct ScriptReader: TokensReader{
         std::vector<Token*> list;
         while(true){
             skipVoid();
-            if(eof())throw missing(end);
+            if(eof())throw missing(end, true);
             if(script[pos]==end){
                 forward(); //假设 end 不是 newline
                 return list;
@@ -452,7 +452,7 @@ Token* ScriptReader::read(){
         return _c;
     }
     auto token = doRead();
-    if(!token)throwError("Unfinished input");
+    if(!token)throwError("Unfinished input", true);
     return token;
 }
 Token* ScriptReader::preview(){
@@ -522,7 +522,7 @@ bool ScriptReader::skipComment(){
     if(script[pos+1]=='*'){
         forwardx(2);
         while(true){
-            if(eof())throwError("Unfinished comment");
+            if(eof())throwError("Unfinished comment", true);
             if(script[pos]=='*' && pos+1<script.size() && script[pos+1]=='/'){
                 forwardx(2);
                 return true;
@@ -852,7 +852,7 @@ std::pair<Expr*, Expr*> parseProp(TokensReader& reader){
 		cl->reader.assetEnd();
 		auto next = reader.preview();
 		if(!next)
-			throw new JuaSyntaxError("Unfinished input", -1, -1, -1);
+			throw new JuaSyntaxError("Unfinished input", -1, -1, -1, true);
 		if(next->str=="="){
 			reader.read();
 			val = parseExpr(reader);
@@ -1067,7 +1067,7 @@ Stmts parseStatements(TokensReader& reader){
 }
 Block* parseBlockOrStatement(TokensReader& reader){
     auto next = reader.preview();
-    if(!next)throw new JuaSyntaxError("Unfinished input", -1, -1, -1);
+    if(!next)throw new JuaSyntaxError("Unfinished input", -1, -1, -1, true);
     if(next->type==Token::BRACE){
         auto cl = static_cast<Enclosure*>(reader.read());
         auto stmts = parseStatements(cl->reader);

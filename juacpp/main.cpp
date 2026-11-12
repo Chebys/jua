@@ -2,6 +2,7 @@
 #include <fstream>
 #include <filesystem>
 #include "jua-vm.h"
+#include "jua-syntax.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -139,46 +140,81 @@ struct JuaRuntime: VM{
     }
 };
 
-// 读一条以分号结尾的多行输入。返回 false 表示输入已结束（EOF）。
-bool readInput(std::string& result){
-    result.clear();
-    std::string line;
-    while (true) {
-        std::cout << "> " << std::flush;
-        if (!std::getline(std::cin, line)) return false; // EOF：必须退出，否则会空转
-        result += line;
-        if (!line.empty() && line.back() == ';') return true;
-        result += '\n';
+// REPL 输入的三种状态
+enum class InputStatus{
+    Complete,   // 能解析出完整的函数体，可以执行
+    Incomplete, // 输入在末尾处用完了，继续读下一行
+    Error       // 真的写错了
+};
+
+// 尝试把 source 解析成一个函数体。成功时 *body 有效；
+// 失败时 *err 有效，由调用者释放。
+static InputStatus tryParse(const std::string& source, FunctionBody** body, JuaSyntaxError** err){
+    try{
+        *body = parse(source);
+        *err = nullptr;
+        return InputStatus::Complete;
+    }catch(JuaSyntaxError* e){
+        *body = nullptr;
+        *err = e;
+        return e->incomplete ? InputStatus::Incomplete : InputStatus::Error;
     }
+}
+
+// REPL：读到能构成完整语句时立即执行，不再依赖分号。
+int runRepl(){
+    cout << "Jua REPL. Input runs as soon as it forms a complete statement.\n";
+    cout << "Type 'exit' to quit, Ctrl+D (Ctrl+Z on Windows) to leave.\n";
+    JuaRuntime rt("<repl>");
+    //整个 REPL 会话共用一个作用域，上一行声明的变量下一行才能用。
+    //它是宿主长期持有的值，必须登记为 GC 根，否则会被回收。
+    auto replEnv = new Scope(rt._G);
+    rt.own(replEnv);
+
+    std::string buffer;
+    while(true){
+        cout << (buffer.empty() ? "> " : "... ") << std::flush;
+        std::string line;
+        if(!std::getline(std::cin, line)) break; // EOF：丢弃未完成的输入并退出
+        if(buffer.empty()){
+            if(line == "exit" || line == "exit;") break;
+            // 空行直接忽略，免得把空输入当成一条语句
+            if(line.find_first_not_of(" \t\r") == std::string::npos) continue;
+        }
+        buffer += line;
+        buffer += '\n';
+
+        FunctionBody* body = nullptr;
+        JuaSyntaxError* syn = nullptr;
+        auto status = tryParse(buffer, &body, &syn);
+        if(status == InputStatus::Incomplete){
+            delete syn;
+            continue; // 继续读：提示符会变成 "... "
+        }
+        if(status == InputStatus::Error){
+            rt.j_stderr(syn);
+            delete syn;
+            buffer.clear();
+            continue;
+        }
+        try{
+            body->exec(replEnv);
+        }catch(JuaError* e){
+            rt.j_stderr(e);
+            delete e;
+        }catch(const std::string& s){
+            std::cerr << s << '\n';
+        }catch(const char* s){
+            std::cerr << s << '\n';
+        }
+        buffer.clear();
+    }
+    return 0;
 }
 
 int main(int argc, char* argv[]){
     SetConsoleToUTF8();
-    if(argc <= 1){
-        //无参数：REPL
-        cout << "Jua REPL. Add ';' to end input. Type 'exit;' to quit.\n";
-        JuaRuntime rt("<repl>");
-        //整个 REPL 会话共用一个作用域，上一行声明的变量下一行才能用。
-        //它是宿主长期持有的值，必须登记为 GC 根，否则会被回收。
-        auto replEnv = new Scope(rt._G);
-        rt.own(replEnv);
-        while (true) {
-            std::string input;
-            if (!readInput(input)) break;
-            if (input == "exit;") break;
-            try{
-                rt.evalIn(replEnv, input);
-            }catch(JuaError* e){
-                rt.j_stderr(e);
-                delete e;
-            }catch(const std::string& s){
-                std::cerr << s << '\n';
-            }catch(const char* s){
-                std::cerr << s << '\n';
-            }
-        }
-        return 0;
-    }
+    if(argc <= 1) return runRepl();
 
     //带参数：运行一个模块。退出码 0 = 成功，1 = 失败，2 = 用法错误
     try{

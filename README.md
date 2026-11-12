@@ -32,14 +32,28 @@ Jua 的官方实现是 [juacpp](juacpp)，目前可构建、可运行，但语�
 cd juacpp
 pwsh ./build.ps1          # -> ../build/jua.exe，只有一个宿主
 pwsh ./run-tests.ps1      # 跑全部工程测试，打印 PASS/FAIL 汇总
+pwsh ./run-repl-tests.ps1 # 跑 REPL 的冒烟测试（runner 只跑模块，覆盖不到 REPL）
 ```
 
 `jua.exe` 一个二进制干两件事：
 
 ```powershell
-../build/jua.exe           # 无参数：REPL（分号结束一条输入）
+../build/jua.exe           # 无参数：REPL（语句完整即执行，不用分号）
 ../build/jua.exe <module>  # 跑一个模块，退出码 0 = 成功 / 1 = 失败 / 2 = 用法错误
 ```
+
+REPL 会自己判断输入是否已经构成完整语句：完整就执行，否则提示符从 `> ` 变成 `... ` 继续读。所以块和多行表达式可以直接换行写，不必用分号收尾。
+
+```
+> let o = {
+...     a = 1,
+...     b = 2
+... }
+> print(o.a + o.b)
+3
+```
+
+`exit` 退出，`Ctrl+D`（Windows 上是 `Ctrl+Z` 回车）也可以。管道同样可用，冒烟测试就是这么跑的。
 
 运行演示脚本（模块名不带 `.jua`，工作目录决定模块搜索路径）：
 

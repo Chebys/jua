@@ -307,8 +307,10 @@ struct JuaSyntaxError: JuaError{
     size_t pos = -1;
     size_t line = -1;
     size_t col = -1;
-    JuaSyntaxError(const std::string& msg, size_t p, size_t l, size_t c):
-        JuaError(msg), pos(p), line(l), col(c){}
+    //输入在末尾处用完了，可能只是还没写完（REPL 据此判断是否继续读）
+    bool incomplete = false;
+    JuaSyntaxError(const std::string& msg, size_t p, size_t l, size_t c, bool inc = false):
+        JuaError(msg), pos(p), line(l), col(c), incomplete(inc){}
     std::string toDebugString() override {
         if(pos == (size_t)-1) return std::format("JuaSyntaxError: {}", message);
         return std::format("JuaSyntaxError: {} at {}:{}", message, line, col);

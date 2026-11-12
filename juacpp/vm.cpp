@@ -136,12 +136,15 @@ void VM::makeGlobal(){
     _G->setProp("throw", makeFunc([this](jualist& args){
         if(args.size() < 1) throw new JuaTypeError("throw() requires at least one argument");
         Value* val = args[0];
-        //todo: 允许抛出对象
-        if(val->type != Value::Str){
-            throw new JuaTypeError("throw() requires a string argument");
-        }
         //用户主动抛出的错误归为 Client 类
-        throw new JuaError(val->toString(), JuaError::Kind::Client);
+        if(val->type == Value::Str){
+            throw new JuaError(val->toString(), JuaError::Kind::Client);
+        }
+        //Error 对象：连同对象本身一起抛出，try 与 catch 都能拿到它
+        if(val->type == Value::Obj && val->isInst(ErrorProto)){
+            throw new JuaErrorWithVal(val->toString(), val, JuaError::Kind::Client);
+        }
+        throw new JuaTypeError("throw() requires a string or an Error object");
         return Null::getInst(); // unreachable, but required for function signature
     }));
     _G->setProp("try", makeFunc([this](jualist& args){
@@ -157,7 +160,11 @@ void VM::makeGlobal(){
             res->setProp("status", Boolean::getInst(true));
             return res;
         } catch (JuaError* e) {
-            res->setProp("error", new String(this, e->toDebugString()));
+            //抛出的若是 Error 对象，就把对象本身交给调用者；否则给错误文本
+            if(auto withVal = dynamic_cast<JuaErrorWithVal*>(e))
+                res->setProp("error", withVal->val);
+            else
+                res->setProp("error", new String(this, e->toDebugString()));
             res->setProp("errorKind", new String(this, e->kindName()));
             res->setProp("status", Boolean::getInst(false));
             delete e; //错误已经转成 jua 值，原对象可以释放

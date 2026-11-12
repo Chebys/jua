@@ -23,3 +23,19 @@ eq(t.errorKind, 'type', '对数字做 in 是 type')
 let okr = try{ return 7 }
 eq(okr.status, true, '成功时 status 为 true')
 eq(Object.get(okr, 'errorKind'), null, '成功时没有 errorKind')
+
+// throw 也接受 Error 对象：对象本身随错误传递
+let raised = try{ throw(Error('bad')) }
+eq(raised.status, false, '抛出 Error 对象同样失败')
+eq(raised.errorKind, 'client', '抛出的 Error 对象归为 client')
+eq(type(raised.error), 'object', 'error 保留对象本身')
+eq(raised.error:toString(), 'Error: bad', '对象保留自己的消息')
+
+let caught = null
+try{ throw(Error('x')) }:catch(err){ caught = err }
+eq(type(caught), 'object', 'catch 收到的是 Error 对象')
+
+// 其他类型不能抛出
+let bad = try{ throw(1) }
+eq(bad.status, false, '抛出非字符串非 Error 时报错')
+eq(bad.errorKind, 'type', '该报错属于 type')

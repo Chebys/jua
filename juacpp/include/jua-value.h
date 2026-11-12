@@ -299,7 +299,9 @@ struct JuaError{
 };
 struct JuaErrorWithVal: JuaError{
     Value* val;
-    JuaErrorWithVal(std::string msg, Value* v): JuaError(msg, Kind::Reference), val(v){}
+    //默认是 Reference：形如「变量不存在」，附带出错时所在的作用域。
+    //throw 抛出的 Error 对象也走这里，但类别是 Client。
+    JuaErrorWithVal(std::string msg, Value* v, Kind k = Kind::Reference): JuaError(msg, k), val(v){}
     std::string toDebugString(){
         std::string str = message;
         str.append("\n\twith value: ");

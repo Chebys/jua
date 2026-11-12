@@ -25,9 +25,13 @@
 ## throw
 	throw(value)
 抛出错误，终止当前计算。
-* value 必须是字符串，它成为错误消息；抛出非字符串报错（抛出任意值尚未支持）。
-* 抛出的错误归类为 `client`，见 [try](#try)。
+* `value` 为字符串时，它成为错误消息。
+* `value` 为 [Error](classes.md#error) 的实例时，对象本身随错误一起抛出：[try](#try) 结果里的 `error` 与 `catch` 的实参都是这个对象。
+* `value` 为其他类型时报错。
+* 抛出的错误一律归类为 `client`，见 [try](#try)。
 * 未被 `try` 捕获时，宿主打印错误并以非零退出码结束本次运行。
+
+* `throw` 是普通函数，`throw value` 并不构成调用。要写 `throw(value)`；`throw '文本'` 之所以可行，是因为[以字面字符串开头的调用](../表达式.md#调用)这条语法。
 
 ## try
 	try(fn, *args)
@@ -39,13 +43,14 @@
 
 失败时返回：
 
-	{status = false, error = 错误文本, errorKind = 错误类别}
+	{status = false, error = 错误对象或错误文本, errorKind = 错误类别}
 
-* `error` 是带类型前缀的文本，如 `JuaTypeError: ...`；`errorKind` 是类别名，见[错误处理](../抽象操作.md#错误处理)。
+* 抛出的若是 [Error](classes.md#error) 实例，`error` 就是该对象；否则 `error` 是带类型前缀的文本，如 `JuaTypeError: ...`。
+* `errorKind` 是类别名，见[错误处理](../抽象操作.md#错误处理)。
 * 参数校验也在保护范围内：`try(1)` 不抛错，而是返回 `status = false`。
 * 结果对象具有 `catch` 方法，因此 `try{...}:catch(err){...}` 等价于 `try(fun(){...}):catch(fun(err){...})`：
 	* `status` 为真时 `catch` 不调用传入的函数，直接返回结果对象本身；
-	* 否则以 `error` 文本为唯一实参调用它，其返回值即整个表达式的结果。
+	* 否则以 `error` 为唯一实参调用它，其返回值即整个表达式的结果。
 ## type
 返回代表值类型的字符串。可能为 "null", "number", "string", "boolean", "object", "function"。
 

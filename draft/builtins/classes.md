@@ -92,15 +92,15 @@ num 有限且没有小数部分时返回 true。
 String 是所有字符串的原型。`String(v)` 返回 v 的 [ToString](../抽象操作.md#tostring)；无参时为空串。
 
 字符串是字节串，下列操作一律以**字节**为单位。
-### String.byte(self, i)
+### String.byte(self, i=0)
 返回第 i 个字节的数值（0～255）。
-* i 省略时为 0；负数从末尾算起；其余按长度取模。
+* i 为负数从末尾算起；其余按长度取模。
 * 空字符串报错。
 
 ### String.escape(str)
 ### String.fromByte(*bytes)
 由实参依次取低 8 位构成的字符串。
-### String.hasItem(self, i)
+### String.hasItem(self, item)
 item 为字符串时判断 self 是否包含它（子串）；否则为 false。
 ### String.getItem(self, i)
 返回第 i 个字节构成的单字节字符串。

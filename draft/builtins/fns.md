@@ -23,7 +23,29 @@
 * 模块的查找方式由宿主决定。官方实现：内置模块名（如 `math`、`json`）由宿主直接提供，其余在当前目录下查找 `<模块名>.jua`。
 
 ## throw
+	throw(value)
+抛出错误，终止当前计算。
+* value 必须是字符串，它成为错误消息；抛出非字符串报错（抛出任意值尚未支持）。
+* 抛出的错误归类为 `client`，见 [try](#try)。
+* 未被 `try` 捕获时，宿主打印错误并以非零退出码结束本次运行。
+
 ## try
+	try(fn, *args)
+以 `args` 为实参调用 `fn`，返回一个结果对象，把「成功」与「失败」都变成数据。
+
+成功时返回：
+
+	{status = true, value = 返回值}
+
+失败时返回：
+
+	{status = false, error = 错误文本, errorKind = 错误类别}
+
+* `error` 是带类型前缀的文本，如 `JuaTypeError: ...`；`errorKind` 是类别名，见[错误处理](../抽象操作.md#错误处理)。
+* 参数校验也在保护范围内：`try(1)` 不抛错，而是返回 `status = false`。
+* 结果对象具有 `catch` 方法，因此 `try{...}:catch(err){...}` 等价于 `try(fun(){...}):catch(fun(err){...})`：
+	* `status` 为真时 `catch` 不调用传入的函数，直接返回结果对象本身；
+	* 否则以 `error` 文本为唯一实参调用它，其返回值即整个表达式的结果。
 ## type
 返回代表值类型的字符串。可能为 "null", "number", "string", "boolean", "object", "function"。
 

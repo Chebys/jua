@@ -298,7 +298,8 @@ Object* VM::makeNumberProto(){
         auto val = args[0];
         if(val->type != Value::Num)return Boolean::getInst(false);
         double d = val->toNumber();
-        return Boolean::getInst(std::floor(d) == d);
+        //Infinity 没有小数部分，但不是整数
+        return Boolean::getInst(std::isfinite(d) && std::floor(d) == d);
     }));
     proto->setProp("encodeUint8", makeEncodeFunc(encode<uint8_t>));
     proto->setProp("decodeUint8", makeDecodeFunc(decode<uint8_t>));
@@ -332,9 +333,14 @@ Object* VM::makeStringProto(){
         if(val->type != Value::Str)
             throw new JuaError("String.byte() called on non-string value");
         auto self = static_cast<String*>(val);
+        if(self->value.empty())
+            throw new JuaRangeError("String.byte() called on an empty string");
         size_t index = 0;
         if(args.size() >= 2){
-            index = args[1]->toInt() % self->value.length();
+            int64_t len = (int64_t)self->value.size();
+            int64_t i = args[1]->toInt();
+            if(i < 0)i += len; //负数从末尾算起
+            index = (size_t)(i % len);
         }
         uint8_t byte = self->value[index];
         return new Number(self->vm, byte);
@@ -369,11 +375,11 @@ Object* VM::makeStringProto(){
             hexStr.push_back(hexDigits[byte & 0x0F]); // 低4位
             hexStr.push_back(' ');
         }
-        hexStr.pop_back();
+        //每字节后都追加了空格，去掉末尾那个；空串没有可去的
+        if(!hexStr.empty())hexStr.pop_back();
         return new String(self->vm, hexStr);
     }));
-    proto->setProp("lower", makeFunc([](jualist& args){
-        if(!args.size())throw new JuaError("String.lower() requires at least 1 argument");
+    proto->setProp("lower", makeFunc([](jualist& args){        if(!args.size())throw new JuaError("String.lower() requires at least 1 argument");
         auto self = args[0];
         if(self->type != Value::Str)throw new JuaError("String.lower() called on non-string value");
         auto str = self->toString();
@@ -447,16 +453,16 @@ Object* VM::makeObjectProto(){
     proto->setProp("new", obj_new);
     proto->setProp("get", makeFunc([](jualist& args){
         if(args.size() < 2) throw new JuaTypeError("Object.get() requires 2 arguments");
+        //obj 未必是对象：任何值都可以进行属性访问（见 draft/builtins/classes.md）
         auto self = args[0];
-        if(self->type != Value::Obj){
-            throw new JuaError("Object.get() called on a non-object");
-        }
-        auto obj = static_cast<Object*>(self);
         auto key = args[1];
         if(key->type != Value::Str){
             throw new JuaError("Object.get() requires a string key");
         }
-        return obj->getOwn(key->toString());
+        auto value = self->getProp(key->toString());
+        if(value)return value;
+        //第三个参数是属性不存在时的默认值
+        return args.size() >= 3 ? args[2] : Null::getInst();
     }));
     proto->setProp("hasOwn", makeFunc([this](jualist& args){
         if(args.size() < 2) throw new JuaTypeError("Object.hasOwn() requires 2 arguments");

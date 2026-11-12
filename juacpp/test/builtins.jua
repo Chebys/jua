@@ -1,6 +1,25 @@
 // 内置值：Array / Buffer / Function / try / throw
 let {eq, ok, throws} = require 'harness'
 
+// Object.get：属性访问（含继承）、默认值、非对象也可用
+eq(Object.get({a = 1}, 'a'), 1, 'Object.get own property')
+eq(Object.get({}, 'x', 9), 9, 'Object.get default value')
+eq(Object.get(5, 'x', 'd'), 'd', 'Object.get works on a non-object')
+let Base = class({m(self){ return 'm' }})
+ok(Object.get(Base(), 'm') != null, 'Object.get sees inherited properties')
+
+// Number.isInt：无穷不是整数
+eq(Number.isInt(3), true, 'isInt on an integer')
+eq(Number.isInt(3.5), false, 'isInt on a fraction')
+eq(Number.isInt(1 / 0), false, 'isInt on infinity')
+
+// String 以字节为单位
+eq(String.byte('abc'), 97, 'byte of the first character')
+eq(String.byte('abc', -1), 99, 'byte with a negative index')
+eq(String.toHex(''), '', 'toHex of an empty string')
+eq(String.toHex('A'), '41', 'toHex of one byte')
+throws(fun(){ String.byte('') }, 'byte on an empty string')
+
 let a = Array.of(1, 2, 3)
 eq(a:len(), 3, 'array len')
 a:push(4)

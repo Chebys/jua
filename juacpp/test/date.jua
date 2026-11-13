@@ -1,0 +1,88 @@
+// date 模块：UTC 时间值、字段、格式化、解析、比较
+let {eq, ok, throws} = require 'harness'
+let date = require 'date'
+
+// ---- epoch ----
+let x = date(0)
+eq(x:getTime(), 0, 'epoch time value')
+eq(x:getFullYear(), 1970, 'epoch year')
+eq(x:getMonth(), 1, 'epoch month (1-based)')
+eq(x:getDate(), 1, 'epoch day of month')
+eq(x:getDay(), 4, '1970-01-01 is Thursday (1=Mon)')
+eq(x:getHours(), 0, 'epoch hour')
+eq(x:toISOString(), '1970-01-01T00:00:00.000Z', 'epoch ISO')
+
+// ---- 字段构造与越界进位 ----
+let y = date(2026, 13, 1)
+eq(y:getFullYear(), 2027, 'month overflow rolls the year')
+eq(y:getMonth(), 1, 'month overflow lands on January')
+
+let z = date(2026, 1, 0)
+eq(z:getFullYear(), 2025, 'day 0 is the last day of the previous month')
+eq(z:getMonth(), 12, 'previous month is December')
+eq(z:getDate(), 31, 'December has 31 days')
+
+eq(date(2024, 2, 29):toISOString(), '2024-02-29T00:00:00.000Z', 'leap day')
+eq(date(2024, 2, 30):getMonth(), 3, 'Feb 30 rolls into March')
+
+// ---- 无效日期 ----
+let bad = date(1e16)
+ok(bad:getTime() != bad:getTime(), 'invalid date has NaN time')
+ok(bad:getFullYear() != bad:getFullYear(), 'getters return NaN on invalid date')
+eq(bad:toJSON(), null, 'toJSON is null on invalid date')
+throws(fun(){ bad:toISOString() }, 'toISOString throws on invalid date')
+eq(String(bad), 'Invalid Date', 'toString of invalid date')
+
+// ---- 取值 ----
+let t = date.UTC(2026, 11, 13, 19, 39, 20, 123)
+eq(t, date.parse('2026-11-13T19:39:20.123Z'), 'UTC and parse agree')
+let full = date(t)
+eq(full:getFullYear(), 2026, 'year')
+eq(full:getMonth(), 11, 'month')
+eq(full:getDate(), 13, 'date')
+eq(full:getHours(), 19, 'hours')
+eq(full:getMinutes(), 39, 'minutes')
+eq(full:getSeconds(), 20, 'seconds')
+eq(full:getMilliseconds(), 123, 'milliseconds')
+eq(full:getDay(), 5, '2026-11-13 is Friday')
+
+// ---- 设值 ----
+let d = date(2026, 1, 15)
+eq(d:setMonth(3), date.UTC(2026, 3, 15), 'setMonth returns the new time value')
+eq(d:getMonth(), 3, 'setMonth applied')
+eq(d:setDate(32), date.UTC(2026, 4, 1), 'setDate overflows into the next month')
+eq(d:setFullYear(2020, 2, 29), date.UTC(2020, 2, 29), 'setFullYear with month and day')
+eq(d:setTime(0), 0, 'setTime')
+eq(d:getTime(), 0, 'setTime applied')
+throws(fun(){ d:setMonth('x') }, 'setter rejects non-numbers')
+
+// ---- 解析 ----
+eq(date.parse('2026-11-13'), date.UTC(2026, 11, 13), 'date only')
+eq(date.parse('2026-11-13T19:39'), date.UTC(2026, 11, 13, 19, 39), 'minutes')
+eq(date.parse('2026-11-13T19:39:20'), date.UTC(2026, 11, 13, 19, 39, 20), 'seconds')
+eq(date.parse('2026-11-13T19:39:20Z'), date.UTC(2026, 11, 13, 19, 39, 20), 'with Z')
+eq(date.parse('2026-11-13T19:39:20+02:00'), date.UTC(2026, 11, 13, 17, 39, 20), 'positive offset')
+eq(date.parse('2026-11-13T19:39:20-02:00'), date.UTC(2026, 11, 13, 21, 39, 20), 'negative offset')
+
+let nan = date.parse('not a date')
+ok(nan != nan, 'unparsable text gives NaN')
+let nan2 = date.parse('2026-13-01')
+ok(nan2 != nan2, 'out-of-range month gives NaN')
+let nan3 = date.parse('2026-11-13T19:39:20.1234Z')
+ok(nan3 != nan3, 'four fractional digits rejected')
+
+// ---- 比较与减法 ----
+ok(date(1000) < date(2000), 'less than')
+ok(date(1000) <= date(1000), 'less or equal')
+ok(date(2000) > date(1000), 'greater than')
+ok(date(1000) == date(1000), 'equality by time value')
+ok(!(date(1000) == date(2000)), 'different times are not equal')
+eq(date(3000) - date(1000), 2000, 'difference in milliseconds')
+eq((date(3000) - 2000):getTime(), 1000, 'subtracting a number gives a date')
+
+// ---- json ----
+let json = require 'json'
+eq(json.encode(date(0)), '"1970-01-01T00:00:00.000Z"', 'json uses toJSON')
+
+// ---- now ----
+ok(date.now():getTime() > 1600000000000, 'now is a real timestamp')

@@ -99,16 +99,88 @@ e 的幂。
 把值编码为 JSON 文本。
 * 支持 null、布尔、数字、字符串、数组与对象；函数被跳过。
 * 对象的键来自自身的属性，顺序取决于实现。
+* 带 `toJSON` 元方法的对象先调用它，再用返回值编码（例如 `date`）。
 
 ### json.decode(str)
 把 JSON 文本解码为值，非法输入报错。
 * 结果是字面对象或数组，不携带类的原型。
 
 ## date
-是一个标准可构造类。
+是一个标准可构造类。`require 'date'` 直接返回它。
+
+时间值是 **UTC 毫秒**，存为实例的自身属性 `time`（数字，可能为 NaN）。以下约定适用于整个模块：
+
+* 一律按 UTC 解释，不读宿主时区。
+* 无效日期的时间值为 NaN：取值方法与 `getTime` 返回 NaN，`toISOString` 报 range 错误。
+* 月份为 **1–12**；星期为 **1–7**（1 = 周一）。
+* 字段越界时**进位**：`date(2026, 13, 1)` 等于 2027 年 1 月。
+
 ### date.init(self, *args)
+与 `date(...)` 相同：
+* 无额外参数：当前时刻。
+* 一个数字：毫秒时间值。
+* 两个及以上数字：`(y, m, d=1, h=0, mi=0, s=0, ms=0)`，按 UTC 解释。
+
+时间值超出 ±8.64e15 时得到无效日期，不报错；参数类型不符报 type 错误。
+
 ### date.now()
+返回当前时刻的实例。
+
+### date.parse(str)
+解析 ISO 8601 子集，返回毫秒时间值；无法解析时返回 NaN（不报错）。
+
+接受的文本：`YYYY-MM-DD`，可追加 `THH:mm`、`:ss`、`.sss`，最后可追加 `Z` 或 `±HH:MM`。
+未带时区标记时按 UTC 解释。
+
+### date.UTC(y, m, d=1, h=0, mi=0, s=0, ms=0)
+由字段得到毫秒时间值，不构造实例。
+
 ### date.getTime(self)
+返回毫秒时间值。
+
+### 取值方法
+| 方法 | 返回 |
+|---|---|
+| `getFullYear(self)` | 年 |
+| `getMonth(self)` | 月（1–12） |
+| `getDate(self)` | 月内第几天（1–31） |
+| `getDay(self)` | 星期（1 = 周一 … 7 = 周日） |
+| `getHours(self)` / `getMinutes(self)` / `getSeconds(self)` / `getMilliseconds(self)` | 时分秒毫秒 |
+
+无效日期上一律返回 NaN。
+
+### 设值方法
+| 方法 | 说明 |
+|---|---|
+| `setTime(self, ms)` | 直接设置时间值 |
+| `setFullYear(self, y[, m, d])` | 设置年月日 |
+| `setMonth(self, m[, d])` | 设置月日 |
+| `setDate(self, d)` | 设置月内第几天 |
+| `setHours(self, h[, mi, s, ms])` | 设置时刻 |
+| `setMinutes(self, mi[, s, ms])` | |
+| `setSeconds(self, s[, ms])` | |
+| `setMilliseconds(self, ms)` | |
+
+* 返回设置后的毫秒时间值。
+* 同样支持越界进位；中间结果超出范围则变为无效日期。
+* 实参必须是数字，否则报 type 错误。
+
+### 格式化方法
+| 方法 | 返回 |
+|---|---|
+| `toISOString(self)` | `YYYY-MM-DDTHH:mm:ss.sssZ`；无效日期报 range 错误 |
+| `toString(self)` | 同 `toISOString`；无效日期为 `"Invalid Date"` |
+| `toJSON(self)` | 同 `toISOString`；无效日期为 null |
+
+年份超出 0000–9999 时用扩展写法 `±YYYYYY`。
+
+### 元方法
+| 时机 | 名字 | 行为 |
+|---|---|---|
+| 对象转字符串 | `toString` | 见上 |
+| `==` | `__eq` | 时间值相等 |
+| `<` `<=` | `__lt` `__le` | 按时间值比较；任一侧无效则为 false |
+| `-` | `__sub` | 日期减日期得毫秒差；日期减数字得新日期 |
 
 ## promise
 是一个可构造类。

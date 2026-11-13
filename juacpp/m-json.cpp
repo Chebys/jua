@@ -40,6 +40,11 @@ string encode(Value* val){
             return res;
         }
         case Value::Obj: {
+            //带 toJSON 元方法的对象先转换成别的值再编码（同 JSON.stringify）
+            if(auto toJSON = val->getMetaMethod("toJSON")){
+                Value* out = toJSON->call({val});
+                if(out && out != val) return encode(out);
+            }
             if(val->isType(Array::type_id)){
                 auto arr = static_cast<Array*>(val);
                 string res = "[";

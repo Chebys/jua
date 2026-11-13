@@ -24,6 +24,7 @@ namespace Jua {
     Object* RangeProto = nullptr;
     Object* ErrorProto = nullptr;
     Object* TryResProto = nullptr;
+    Object* DateProto = nullptr;
 
     NativeFunction* obj_new = nullptr;
     NativeFunction* obj_hasOwn = nullptr;
@@ -86,6 +87,7 @@ namespace Jua {
 
     Object* makeMath();
     Object* makeJSON();
+    Object* makeDate();
 
     private:
     size_t idcounter = 0;

@@ -7,7 +7,7 @@ $ErrorActionPreference = 'Stop'
 
 $sources = @(
     'debug.cpp', 'value.cpp', 'gc.cpp', 'parser.cpp',
-    'program.cpp', 'vm.cpp', 'm-math.cpp', 'm-json.cpp', 'main.cpp'
+    'program.cpp', 'vm.cpp', 'm-math.cpp', 'm-json.cpp', 'm-date.cpp', 'main.cpp'
 )
 $target = '../build/jua.exe'
 

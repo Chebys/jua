@@ -10,6 +10,7 @@ VM::VM(){
     makeGlobal();
     modules["math"] = makeMath();
     modules["json"] = makeJSON();
+    modules["date"] = makeDate();
 }
 
 void VM::run(const string& script){

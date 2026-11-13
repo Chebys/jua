@@ -93,6 +93,19 @@ num 有限且没有小数部分时返回 true。
 
 ### 编解码函数
 所有编码函数以 `Number.encodeXXX` 命名，解码函数以 `Number.decodeXXX` 命名，其中 `XXX` 是编码名称。
+
+| 编码名 | 类型 | 宽度（字节） |
+|---|---|---|
+| `Int8` / `Uint8` | 有符号 / 无符号 8 位整数 | 1 |
+| `Int16` / `Uint16` | 16 位整数 | 2 |
+| `Int32` / `Uint32` | 32 位整数 | 4 |
+| `Float32` / `Float64` | 浮点数 | 4 / 8 |
+
+* `Number.encodeXXX(*nums)`：把每个实参按其类型换成 `XXX`，依次追加原始字节，返回字节串。
+* `Number.decodeXXX(str)`：读 `str` 开头 `XXX` 宽度的字节，返回对应的数字；`str` 不足该宽度时报错。
+* 字节序是宿主的原生顺序，由 `Number.LITTLE_ENDIAN` 指示。
+
+例：`Number.encodeUint8(97, 98)` 得到 `'ab'`；`Number.decodeUint16(Number.encodeUint16(513))` 得到 `513`。
 ### Number.parse(str)
 把字符串解析为数字。
 * 解析规则同数字字面量：可选符号、整数部分、小数部分、指数部分。

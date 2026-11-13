@@ -155,7 +155,7 @@ __match(self, str):
 
 1. **`modules.md` 的 `## regex` 章节**：定稿后替换现有空标题，列全构造、标志、实例属性、方法。
 2. **`classes.md` 的 `## String`**：补 `match`/`matchAll`/`search`/`replace`/`split`（均为新建，现有 String 无这些方法）。
-3. **`__match` 元方法**：在 `词法.md` 的元方法表补一行：`__match` 由 `String.match` 调用，非运算符触发。
+3. **`__match` 元方法**：在 `抽象操作.md` 的「元方法 · 其他时机」补一行：`__match` 由 `String.match` 调用，非运算符触发。
 4. **错误类型**：模式编译失败用 `JuaSyntaxError`（`kind=Syntax`）；实参类型不符用 `JuaTypeError`；`lastIndex` 越界用 `JuaRangeError`。
 
 ## 6. 用例（预期行为）
@@ -222,7 +222,7 @@ for(m in 'a1b2c3':matchAll(re(`\w(\d)`, 'g'))){
 
 ## 8. 推进顺序
 
-1. 定稿内容并入 `modules.md` 的 `## regex`，`classes.md` 的 `## String` 补方法，`词法.md` 补 `__match` 元方法行。
+1. 定稿内容并入 `modules.md` 的 `## regex`，`classes.md` 的 `## String` 补方法，`抽象操作.md` 的元方法表补 `__match`。
 2. 实现 `m-regex.cpp`（构造 + exec + test + `__match`）。
 3. 实现 String 的 `match`/`search`/`replace`/`split`/`matchAll`。
 4. 新增 `test/regex.jua`，覆盖 §7 用例 + 边界（空匹配、lastIndex 回绕、捕获组未参与、sticky、标志组合）。

@@ -472,6 +472,27 @@ Object* VM::makeObjectProto(){
         //第三个参数是属性不存在时的默认值
         return args.size() >= 3 ? args[2] : Null::getInst();
     }));
+    proto->setProp("assign", makeFunc([this](jualist& args){
+        if(args.size() < 1) throw new JuaTypeError("Object.assign() requires at least 1 argument");
+        auto target = args[0];
+        if(target->type != Value::Obj)
+            throw new JuaTypeError("Object.assign() requires an object target");
+        auto dst = static_cast<Object*>(target);
+        for(size_t i=1; i<args.size(); i++){
+            auto src = args[i];
+            if(src->type == Value::Null) continue; //同 JS：null 源被忽略
+            if(src->type != Value::Obj)
+                throw new JuaTypeError("Object.assign() requires object sources");
+            auto obj = static_cast<Object*>(src);
+            //先收集再写入：源与目标可能是同一个对象，边遍历边插入会破坏迭代器
+            std::vector<std::pair<std::string, Value*>> pairs;
+            for(auto& kv: obj->dict)
+                pairs.emplace_back(kv.first, kv.second);
+            for(auto& [key, value]: pairs)
+                dst->setProp(key, value);
+        }
+        return target;
+    }));
     proto->setProp("hasOwn", makeFunc([this](jualist& args){
         if(args.size() < 2) throw new JuaTypeError("Object.hasOwn() requires 2 arguments");
         auto self = args[0];

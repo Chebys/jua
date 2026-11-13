@@ -23,3 +23,21 @@ Object.set(o, 'c', 9)
 eq(o.c, 9, 'Object.set')
 Object.del(o, 'c')
 eq(Object.hasOwn(o, 'c'), false, 'Object.del')
+
+// Object.assign：复制自身属性，返回 target
+let target = {a = 1}
+eq(Object.assign(target, {b = 2}), target, 'assign returns the target')
+eq(target.b, 2, 'assign copies own properties')
+eq(target.a, 1, 'assign keeps existing properties')
+eq(Object.assign({}, {x = 1}, {x = 2}).x, 2, 'later source wins')
+eq(Object.hasOwn(Object.assign({}, null), 'x'), false, 'null source is ignored')
+
+let proto = {inh = 1}
+let inherited = {}
+Object.setProto(inherited, proto)
+eq(Object.hasOwn(Object.assign({}, inherited), 'inh'), false, 'inherited props are not copied')
+
+let self = {k = 1}
+Object.assign(self, self)
+eq(self.k, 1, 'assigning an object to itself works')
+eq(Object.get(Object.assign({}), 'k'), null, 'assign with no sources returns the target')

@@ -10,6 +10,14 @@
 ## Object
 Object 是所有普通对象的原型。
 
+### Object.assign(target, *sources)
+把各源的**自身属性**依次复制到 target，返回 target。
+* target 必须是对象；源必须是对象，null 被忽略。
+* 后出现的源覆盖先出现的源；值按引用复制，不做深拷贝。
+* 不复制继承来的属性。
+
+例：`Object.assign({}, {a = 1}, {b = 2})` 得到 `{a = 1, b = 2}`。
+
 ### Object.del(obj, key)
 删除 obj 的自身属性 key，返回 null。
 * obj 必须是对象，key 必须是字符串，否则报错。

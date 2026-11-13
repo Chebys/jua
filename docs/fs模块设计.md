@@ -45,20 +45,24 @@
 |---|---|
 | `fs.exists(path)` | 路径是否存在，返回布尔 |
 | `fs.stat(path)` | 返回 `{type = 'file' \| 'directory' \| 'other', size, mtime}`；不存在返回 null |
-| `fs.list(dir)` | 返回目录项名字构成的数组；不是目录时报错 |
+| `fs.list(dir, withType=false)` | 返回目录项构成的数组；`withType` 为真时每项是 `{name, type}`，否则只是名字 |
 
 * `size` 是字节数；对目录无意义，取 0。
 * `mtime` 是修改时间，单位毫秒（与 [`date`](../draft/builtins/modules.md#date) 的时间值一致，可直接 `date(mtime)`）。
+* `fs.list` 的 `type` 取值与 `fs.stat` 相同；对非目录报错。
 
 ## 5. 目录与改名
 
 | 函数 | 说明 |
 |---|---|
-| `fs.mkdir(path)` | 创建目录，逐级创建（同 `mkdir -p`）；已存在不报错 |
-| `fs.remove(path)` | 删除文件或**空**目录；不存在报错 |
+| `fs.mkdir(path, recursive=false)` | 创建目录 |
+| `fs.remove(path, recursive=false)` | 删除文件或目录 |
 | `fs.rename(from, to)` | 改名或移动；跨设备移动由宿主决定是否支持 |
 
-* `fs.remove` 不递归删除非空目录——要删整棵树请自行遍历。
+* `recursive` 为**假**时：`mkdir` 只建一级，父目录不存在或目标已存在都报错；`remove` 只删文件或空目录，遇到非空目录报错。
+* `recursive` 为**真**时：`mkdir` 逐级创建，目录已存在不报错；`remove` 连同目录内容一起删除。
+* 目标已存在但不是目录时（例如同名文件），两种 `mkdir` 都报错。
+* 选项参数只认 `null` 或布尔；其它类型报 type 错误。
 
 ## 6. 错误
 
@@ -90,10 +94,22 @@ eq(fs.stat('nope.txt'), null, 'missing path gives null')
 
 eq(fs.exists('nope.txt'), false, 'exists on missing path')
 
-fs.mkdir('tmp/a/b')
-ok(fs.stat('tmp/a/b').type == 'directory', 'mkdir creates parents')
+// mkdir：默认只建一级，recursive 逐级
+fs.mkdir('tmp')
+fs.mkdir('tmp/a')
+throws(fun(){ fs.mkdir('tmp/a/b') }, 'non-recursive mkdir needs the parent')
+fs.mkdir('tmp/a/b', true)
+ok(fs.stat('tmp/a/b').type == 'directory', 'recursive mkdir creates parents')
+fs.mkdir('tmp/a', true)                       // 已存在，不报错
+throws(fun(){ fs.mkdir('tmp/a') }, 'non-recursive mkdir rejects an existing dir')
+
 fs.write('tmp/a/b/f.txt', 'x')
-eq(fs.list('tmp/a'), ['b'], 'list directory')
+
+// list：默认给名字，withType 给 {name, type}
+eq(fs.list('tmp/a'), ['b'], 'list names')
+let detailed = fs.list('tmp/a', true)
+eq(detailed[0].name, 'b', 'list with type: name')
+eq(detailed[0].type, 'directory', 'list with type: type')
 
 fs.rename('tmp.txt', 'tmp2.txt')
 eq(fs.exists('tmp.txt'), false, 'rename moves away')
@@ -101,21 +117,22 @@ fs.remove('tmp2.txt')
 eq(fs.exists('tmp2.txt'), false, 'remove deletes')
 
 throws(fun(){ fs.read('nope.txt') }, 'read on missing file throws')
-throws(fun(){ fs.remove('tmp/a') }, 'remove refuses non-empty directory')
+throws(fun(){ fs.remove('tmp/a') }, 'non-recursive remove refuses non-empty dir')
+fs.remove('tmp', true)                        // 递归删除整棵树
+eq(fs.exists('tmp'), false, 'recursive remove clears the tree')
 ```
 
-## 8. 需要拍板的点
+## 8. 已定的取舍
 
-1. **`fs.mkdir` 是否逐级创建**：本文建议逐级（`mkdir -p`），已存在不报错。另一种是只建一级、已存在报错（更接近系统调用）。
-2. **`fs.remove` 是否允许递归删除**：本文建议不允许，避免误删整棵树。
-3. **`fs.stat` 的时间字段**：用毫秒数字（本文建议，与 `date` 配合），还是直接给 `date` 实例（会让 fs 依赖 date 模块）。
-4. **是否需要 `fs.cwd()` / `fs.chdir()`**：本文暂不提供——改变进程工作目录会影响模块查找。
-5. **`fs.list` 的返回**：只给名字（本文建议），还是给 `{name, type}` 对象（多一次 stat，慢但有用）。
-6. **符号链接**：跟随还是保留？本文暂不特殊处理，交给宿主。
+* `mkdir` / `remove` 的递归由**选项参数**决定，默认不递归——危险操作要显式写 `true`。
+* `list` 是否带类型也由选项参数决定，默认只给名字（少一次 stat，快）。
+* `stat.mtime` 用毫秒数字，不给 `date` 实例，避免 fs 依赖 date 模块。
+* 不提供 `cwd` / `chdir`：改变进程工作目录会影响模块查找。
+* 符号链接不特殊处理，跟随与否交给宿主。
 
 ## 9. 推进顺序
 
-1. 定下 §8 的六点，把本文并入 `juacpp/README.md` 的模块一节，删除本文件。
+1. 把本文并入 `juacpp/README.md` 的模块一节，删除本文件。
 2. 实现 `m-fs.cpp`，用 `std::filesystem`；路径按 UTF-8 → 宽字符转换（Windows）。
 3. 新增 `test/fs.jua`：用临时目录做读写、追加、目录、改名、删除与错误路径。
 4. 测试要能清理自己创建的临时文件，避免污染仓库。

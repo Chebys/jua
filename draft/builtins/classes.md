@@ -33,28 +33,34 @@ Object 是所有普通对象的原型。
 返回 obj 的自身属性 key；不存在时返回 default。
 * obj 必须是对象，key 必须是字符串，否则报错。
 * 与 `Object.get` 的区别：只查自身属性，不沿原型链查找。
-### Object.getProto
-获取一个值（未必对象）的原型。
+### Object.getProto(v)
+返回 v 的原型；v 没有原型时返回 null。
+* v 可以是任意值。数字、字符串等内置类型都有自己的原型；字面对象没有。
 ### Object.hasOwn
 返回布尔值：obj 是否具有自身属性 key。
 * obj 必须是对象，key 必须是字符串，否则报错。
 
-### Object.id
-用于获取引用类型值（包括对象和函数）的 id。
-
-满足：
-* id 是一个非负整数
-* 不同引用具有不同的 id
+### Object.id(v)
+返回 v 的 id，一个正整数。
+* v 必须是对象或函数，否则报 type 错误。
+* 同一个值多次取用得到同一个 id；不同值的 id 不同。
+* id 在第一次取用时才分配，因此不反映创建顺序，也不保证连续。
 ### Object.keys(obj)
 返回对象自身所有属性键构成的数组。
 * 键的顺序取决于实现。
 ### Object.new(proto, *args)
-等效于
+创建并返回一个以 proto 为原型的新对象。
+* proto 省略或为 null 时，新对象没有原型。
+* proto 必须是对象或 null，否则报 type 错误。
+* 若沿原型链能找到 `init` 元方法，则以新对象为首个实参、`args` 为其余实参调用它；没有 `init` 时直接返回新对象。
+* 调用一个类等价于对它执行 Object.new：`K(args)` 就是 `Object.new(K, args)`。
+
+等效于：
 
     fun(proto, *args){
 		let obj = {}
 		Object.setProto(obj, proto)
-		if(type(proto.init)=='function')
+		if(type(proto.init) == 'function')
 			proto.init(obj, *args)
 		return obj
 	}

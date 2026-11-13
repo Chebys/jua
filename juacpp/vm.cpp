@@ -44,7 +44,7 @@ void VM::initBuiltins(){
             if(proto->type == Value::Null){
                 proto = nullptr;
             }else if(proto->type != Value::Obj){
-                throw new JuaError("Object.new() requires an object prototype");
+                throw new JuaTypeError("Object.new() requires an object prototype");
             }
             args.pop_front();
         }
@@ -580,7 +580,7 @@ Object* VM::makeObjectProto(){
         if(args.size() < 1) throw new JuaTypeError("Object.id() requires 1 argument");
         auto self = args[0];
         if(self->type != Value::Obj && self->type != Value::Func){
-            throw new JuaError("Object.id() expected an object or function");
+            throw new JuaTypeError("Object.id() expected an object or function");
         }
         if(self->id == (size_t)-1){
             self->id = ++idcounter; // 分配一个唯一的 ID

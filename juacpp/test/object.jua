@@ -1,5 +1,5 @@
 // 对象：字面量、计算键、解构、默认值
-let {eq} = require 'harness'
+let {eq, ok, throws} = require 'harness'
 
 let k = 'kk'
 let o = {a = 1, b = 2, [k] = 3}
@@ -41,3 +41,25 @@ let self = {k = 1}
 Object.assign(self, self)
 eq(self.k, 1, 'assigning an object to itself works')
 eq(Object.get(Object.assign({}), 'k'), null, 'assign with no sources returns the target')
+
+// Object.id：稳定、唯一、正整数
+let oid = {}
+let oid2 = {}
+eq(Object.id(oid), Object.id(oid), 'id is stable per value')
+ok(Object.id(oid) != Object.id(oid2), 'different values have different ids')
+ok(Number.isInt(Object.id(oid)) && Object.id(oid) > 0, 'id is a positive integer')
+throws(fun(){ Object.id(1) }, 'id rejects non-objects')
+
+// Object.getProto
+eq(Object.getProto(oid), null, 'literal objects have no prototype')
+eq(Object.getProto(1), Number, 'numbers use Number as prototype')
+eq(Object.getProto(null), null, 'null has no prototype')
+
+// Object.new
+let noProto = Object.new(null)
+eq(Object.getProto(noProto), null, 'Object.new(null) leaves no prototype')
+let K = class({init(self, x){ self.x = x }})
+let k = Object.new(K, 7)
+eq(k.x, 7, 'Object.new calls init')
+eq(Object.getProto(k), K, 'Object.new sets the prototype')
+throws(fun(){ Object.new(1) }, 'Object.new rejects non-object prototypes')

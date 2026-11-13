@@ -25,6 +25,7 @@ namespace Jua {
     Object* ErrorProto = nullptr;
     Object* TryResProto = nullptr;
     Object* DateProto = nullptr;
+    Object* PairsProto = nullptr; //Object.pairs 返回的迭代器共用的原型
 
     NativeFunction* obj_new = nullptr;
     NativeFunction* obj_hasOwn = nullptr;
@@ -33,6 +34,7 @@ namespace Jua {
     // ---- 垃圾回收（非移动标记-清除，见 gc.cpp） ----
     std::unordered_set<Value*> allValues; //所有由本 VM 分配、受回收管理的值
     std::vector<Value*> gcRoots;          //求值期间临时根（调用帧、迭代器、参数表）
+    std::vector<Scope*> scopeStack;       //正在执行的作用域；宿主手工触发回收时也要保活
     std::vector<Value*> markStack;        //标记阶段的显式栈，避免深递归
     size_t gcThreshold = 100000;          //存活值数超过它则在下个安全点回收
     size_t collectedCount = 0;            //累计回收次数（诊断用）
@@ -105,7 +107,15 @@ struct RootGuard{
     RootGuard(VM* v): vm(v), base(v->gcRoots.size()){}
     ~RootGuard(){ vm->gcRoots.resize(base); }
     RootGuard(const RootGuard&) = delete;
-    RootGuard& operator=(const RootGuard&) = delete;
-};
+    RootGuard& operator=(const RootGuard&) = delete;};
+
+// 作用域栈的 RAII 守卫：Block::exec 期间把 env 记在 VM 上，
+// 这样宿主手工触发的 collect() 也能把它当作根，不会回收局部变量。
+struct ScopeGuard{
+    VM* vm;
+    ScopeGuard(VM* v, Scope* env): vm(v){ vm->scopeStack.push_back(env); }
+    ~ScopeGuard(){ vm->scopeStack.pop_back(); }
+    ScopeGuard(const ScopeGuard&) = delete;
+    ScopeGuard& operator=(const ScopeGuard&) = delete;};
 
 }

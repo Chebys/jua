@@ -67,10 +67,12 @@ size_t VM::collect(){
     root(RangeProto, "RangeProto");
     root(ErrorProto, "ErrorProto");
     root(TryResProto, "TryResProto");
+    root(PairsProto, "PairsProto");
     root(obj_new, "obj_new");
     root(obj_hasOwn, "obj_hasOwn");
     root(obj_next, "obj_next");
     for(auto v: ownedValues)root(v, "ownedValues");
+    for(auto s: scopeStack)root(s, "scopeStack");
     for(auto v: gcRoots)root(v, "gcRoots");
     rootTag = nullptr;
 

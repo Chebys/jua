@@ -358,6 +358,8 @@ Block::Block(Stmts stmts): statements(stmts){
 }
 void Block::exec(Scope* env, Controller* controller){ //env是新产生的作用域
     //d_log("Block::exec");
+    //执行期间 env 必须保活：宿主可以在这个块内部手工触发 collect()
+    ScopeGuard scopeGuard(env->vm, env);
     for(auto stmt: statements){
         //安全点：此刻活跃的 jua 值只有 env 与待返回值，二者都作为根传入
         env->vm->safePoint(env, controller->retval);

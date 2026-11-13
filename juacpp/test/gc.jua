@@ -26,3 +26,26 @@ while(i < 20000){
 let after = Runtime.gcStats()
 ok(after.live < 60000, 'cyclic closures were collected')
 ok(after.freed > 10000, 'many values were freed')
+
+// 宿主手工触发回收时，正在执行的作用域也必须是根，否则局部变量会被回收
+fun keepLocal(){
+    let box = {v = 42}
+    Runtime.collect()
+    return box.v
+}
+eq(keepLocal(), 42, 'manual collect keeps the current scope alive')
+
+let loopSum = 0
+for(v in [1, 2, 3]){
+    loopSum += v
+    Runtime.collect()
+}
+eq(loopSum, 6, 'manual collect inside a loop is safe')
+
+// 迭代器在循环中存活，其目标也必须存活
+let pairSum = 0
+for([k, v] in Object.pairs({a = 1, b = 2, c = 3})){
+    pairSum += v
+    Runtime.collect()
+}
+eq(pairSum, 6, 'manual collect keeps iteration targets alive')

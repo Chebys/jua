@@ -543,36 +543,37 @@ Object* VM::makeObjectProto(){
         }
         return arr;
     }));
-    // 每次调用建一个迭代器原型：元方法只查原型，next 必须挂在原型上
+    // 迭代器原型只建一次：元方法只查原型，next 必须挂在原型上。
+    // 实例只持有被迭代对象，进度由迭代键（上一次的键）携带。
+    PairsProto = new Object(this);
+    PairsProto->setProp("next", makeFunc([this](jualist& args) -> Value* {
+        if(args.size() < 2) throw new JuaTypeError("pairs.next() requires 2 arguments");
+        auto iter = args[0];
+        if(iter->type != Value::Obj)
+            throw new JuaTypeError("pairs.next() called on a non-object");
+        auto target = static_cast<Object*>(iter)->getOwn("target");
+        if(!target || target->type != Value::Obj)
+            throw new JuaError("pairs iterator is invalid");
+        jualist nextArgs{target, args[1]};
+        auto res = obj_next->call(nextArgs);
+        auto done = res->getProp("done");
+        if(done && done->toBoolean())return res;
+        auto key = res->getProp("key");
+        auto pair = new Array(this, {});
+        pair->items.push_back(key);
+        pair->items.push_back(static_cast<Object*>(target)->getOwn(key->toString()));
+        auto out = new Object(this);
+        out->setProp("done", Boolean::getInst(false));
+        out->setProp("key", key);
+        out->setProp("value", pair);
+        return out;
+    }));
     proto->setProp("pairs", makeFunc([this](jualist& args){
         if(args.size() < 1) throw new JuaTypeError("Object.pairs() requires 1 argument");
         auto self = args[0];
         if(self->type != Value::Obj)
             throw new JuaTypeError("Object.pairs() called on a non-object");
-        auto itProto = new Object(this);
-        itProto->setProp("next", makeFunc([this](jualist& args) -> Value* {
-            if(args.size() < 2) throw new JuaTypeError("pairs.next() requires 2 arguments");
-            auto iter = args[0];
-            if(iter->type != Value::Obj)
-                throw new JuaTypeError("pairs.next() called on a non-object");
-            auto target = static_cast<Object*>(iter)->getOwn("target");
-            if(!target || target->type != Value::Obj)
-                throw new JuaError("pairs iterator is invalid");
-            jualist nextArgs{target, args[1]};
-            auto res = obj_next->call(nextArgs);
-            auto done = res->getProp("done");
-            if(done && done->toBoolean())return res;
-            auto key = res->getProp("key");
-            auto pair = new Array(this, {});
-            pair->items.push_back(key);
-            pair->items.push_back(static_cast<Object*>(target)->getOwn(key->toString()));
-            auto out = new Object(this);
-            out->setProp("done", Boolean::getInst(false));
-            out->setProp("key", key);
-            out->setProp("value", pair);
-            return out;
-        }));
-        auto iter = new Object(this, itProto);
+        auto iter = new Object(this, PairsProto);
         iter->setProp("target", self);
         return iter;
     }));

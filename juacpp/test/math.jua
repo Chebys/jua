@@ -1,0 +1,81 @@
+// math 模块：三角/对数/取整/最值/随机
+let {eq, near, ok, throws} = require 'harness'
+let math = require 'math'
+
+// 常量
+near(math.PI, 3.141592653589793, 'PI')
+near(math.E, 2.718281828459045, 'E')
+
+// 三角函数
+near(math.sin(0), 0, 'sin 0')
+near(math.cos(0), 1, 'cos 0')
+near(math.tan(0), 0, 'tan 0')
+near(math.sin(math.PI / 2), 1, 'sin pi/2')
+
+// 反三角函数
+near(math.asin(1), math.PI / 2, 'asin 1')
+near(math.acos(1), 0, 'acos 1')
+near(math.atan(1), math.PI / 4, 'atan 1')
+throws(fun(){ math.asin(2) }, 'asin out of range')
+throws(fun(){ math.acos(-2) }, 'acos out of range')
+
+// 平方根
+near(math.sqrt(4), 2, 'sqrt 4')
+near(math.sqrt(2), 1.4142135623730951, 'sqrt 2')
+throws(fun(){ math.sqrt(-1) }, 'sqrt negative')
+
+// 对数
+near(math.log(math.E), 1, 'log e')
+near(math.log2(8), 3, 'log2 8')
+near(math.log10(1000), 3, 'log10 1000')
+throws(fun(){ math.log(0) }, 'log zero')
+throws(fun(){ math.log2(-1) }, 'log2 negative')
+throws(fun(){ math.log10(-1) }, 'log10 negative')
+
+// e 的幂
+near(math.exp(0), 1, 'exp 0')
+near(math.exp(1), math.E, 'exp 1')
+
+// 绝对值
+eq(math.abs(-5), 5, 'abs negative')
+eq(math.abs(5), 5, 'abs positive')
+eq(math.abs(0), 0, 'abs zero')
+near(math.abs(-3.5), 3.5, 'abs fraction')
+
+// 取整
+eq(math.ceil(1.1), 2, 'ceil')
+eq(math.floor(1.9), 1, 'floor')
+eq(math.round(2.5), 3, 'round half away from zero')
+eq(math.round(-2.5), -3, 'round negative half away from zero')
+eq(math.trunc(1.9), 1, 'trunc positive')
+eq(math.trunc(-1.9), -1, 'trunc negative')
+
+// 最大值 / 最小值
+eq(math.max(1, 2, 3), 3, 'max of three')
+eq(math.min(1, 2, 3), 1, 'min of three')
+eq(math.max(-1), -1, 'max single')
+eq(math.min(-1), -1, 'min single')
+eq(math.max(3, 1, 2, 5, 4), 5, 'max of five')
+eq(math.min(3, 1, 2, 5, 4), 1, 'min of five')
+throws(fun(){ math.max() }, 'max no args')
+throws(fun(){ math.min() }, 'min no args')
+throws(fun(){ math.max(1, 'x') }, 'max non-number')
+
+// 随机数：[0, 1)
+let r = math.random()
+ok(r >= 0, 'random >= 0')
+ok(r < 1, 'random < 1')
+// 多次调用应有变化（极小概率全相同，接受 5 次内至少 2 个不同）
+let distinct = {}
+for(i in 0..4){
+    let s = math.random()
+    distinct[String(s)] = true
+}
+let count = 0
+for(v in distinct){ count = count + 1 }
+ok(count >= 2, 'random produces varied values')
+
+// 类型检查
+throws(fun(){ math.sin('x') }, 'sin non-number')
+throws(fun(){ math.abs(null) }, 'abs non-number')
+throws(fun(){ math.sqrt('x') }, 'sqrt non-number')

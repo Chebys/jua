@@ -5,6 +5,8 @@
 所有内置类都是可构造类。
 <!--内置类的内置属性不应被改变，否则行为未定义。-->
 
+若无特别说明，`self` 表示对应类的实例。
+
 ## Object
 Object 是所有普通对象的原型。
 
@@ -19,7 +21,10 @@ Object 是所有普通对象的原型。
 * 相比直接抽取，不会因为属性不存在而报错
 * 属性不存在时返回 default
 
-### Object.getOwn
+### Object.getOwn(obj, key, default=null)
+返回 obj 的自身属性 key；不存在时返回 default。
+* obj 必须是对象，key 必须是字符串，否则报错。
+* 与 `Object.get` 的区别：只查自身属性，不沿原型链查找。
 ### Object.getProto
 获取一个值（未必对象）的原型。
 ### Object.hasOwn
@@ -33,6 +38,8 @@ Object 是所有普通对象的原型。
 * id 是一个非负整数
 * 不同引用具有不同的 id
 ### Object.keys(obj)
+返回对象自身所有属性键构成的数组。
+* 键的顺序取决于实现。
 ### Object.new(proto, *args)
 等效于
 
@@ -87,6 +94,9 @@ num 有限且没有小数部分时返回 true。
 ### 编解码函数
 所有编码函数以 `Number.encodeXXX` 命名，解码函数以 `Number.decodeXXX` 命名，其中 `XXX` 是编码名称。
 ### Number.parse(str)
+把字符串解析为数字。
+* 解析规则同数字字面量：可选符号、整数部分、小数部分、指数部分。
+* 无法解析时返回 `null`。
 
 ## String
 String 是所有字符串的原型。`String(v)` 返回 v 的 [ToString](../抽象操作.md#tostring)；无参时为空串。
@@ -98,6 +108,11 @@ String 是所有字符串的原型。`String(v)` 返回 v 的 [ToString](../抽�
 * 空字符串报错。
 
 ### String.escape(str)
+把字符串中的特殊字节转义为 `\xXX` 形式（`x` 加两位十六进制，见[反转义](../词法.md#字面字符串求值)），使其可安全嵌入单引号/双引号字符串字面量。
+* 被转义的字节：`\`、引号、以及非可打印 ASCII 字节（0x00–0x1F、0x7F）。
+* 其余字节不变。
+
+* 必须用 `\xXX` 而不是 `\XX`：`\1`～`\9` 在 Jua 里是语法错误，`\41` 无法回读。
 ### String.fromByte(*bytes)
 由实参依次取低 8 位构成的字符串。
 ### String.hasItem(self, item)
@@ -109,7 +124,32 @@ item 为字符串时判断 self 是否包含它（子串）；否则为 false。
 字节数。
 ### String.lower(str)
 把 ASCII 大写字母转成小写，其余字节不变。
+### String.match(self, pat)
+* 若 `pat` 有 `__match` 元方法：以 `pat` 为 self、`self` 为参数调用它，返回其结果。
+* 若 `pat` 是字符串：隐式转为 `regex(pat)`（无标志），再走 `__match`。
+* 无匹配返回 `null`。
+### String.matchAll(self, pat)
+* 若 `pat` 是字符串：隐式转为 `regex(pat, 'g')`。
+* 要求 `pat` 带 `g` 标志，否则报错。
+* 返回一次性迭代器，每次产出一个匹配结果数组（同 `regex.exec` 的返回值）。
+### String.replace(self, pattern, replacement)
+* `pattern` 为字符串时只替换第一个出现的子串；为 regex 实例时按标志行为（`g` 换全部，否则换第一个）。
+* `replacement` 为字符串时支持占位符：`$$`→`$`、`$&`→整个匹配、`$1`..`$9`→捕获组、`$<name>`→命名捕获组、`` $` ``→匹配前、`$'`→匹配后。
+* `replacement` 为函数 `fun(match, g1, g2, ..., index, input)` 时，返回替换文本；未参与匹配的组传 `null`。
+* 返回新字符串。
+### String.replaceAll(self, pattern, replacement)
+* `pattern` 为字符串时替换所有出现的子串；为 regex 实例时要求带 `g` 标志（否则报错）。
+* `replacement` 的占位符与函数形式同 `replace`。
+* 返回新字符串。
+### String.search(self, pat)
+返回第一个匹配的字节下标，无匹配返回 -1。不修改 `pat.lastIndex`。`pat` 为字符串时隐式构造。
+### String.split(self, separator, limit?)
+* `separator` 为 null/空串时按字节拆分；为字符串时按字面子串拆分；为 regex 实例时按匹配拆分（捕获组并入结果）。
+* `limit` 最多保留前 `limit` 段，省略为全部。
+* 返回数组。
 ### String.unescape(str)
+`String.escape` 的逆操作：把 `\xXX` 形式的转义序列还原为对应字节。
+* 非法的转义序列报错。
 ### String.upper(str)
 把 ASCII 小写字母转成大写，其余字节不变。
 ### String.slice(self, i, j)
@@ -125,9 +165,12 @@ Function 是所有函数（原生函数与自定义函数）的原型。
 ## Array
 Array 是所有数组的原型。`Array(iterable)` 把可迭代对象的元素收集为新数组。
 ### Array.entries(self)
+返回可迭代对象，产生 `[index, value]` 二元数组。
 ### Array.getItem(self, i)
+返回第 i 个元素。
+* 索引按[下标](../值与类型.md)规则回绕，负数从末尾算起。
 ### Array.join(self, sep='')
-把元素依次转换为字符串，再用 sep 连接。对任意可迭代对象有效。
+把元素依次转换为字符串，再用 sep 连接。self 可以是任意可迭代对象。
 ### Array.len(self)
 元素个数。
 ### Array.pop(self)
@@ -137,15 +180,19 @@ Array 是所有数组的原型。`Array(iterable)` 把可迭代对象的元素�
 ### Array.of(*items)
 由实参构成的新数组。
 ### Array.resize(self, len)
-### Array.setItem(self, i)
+调整数组长度为 len。
+* len 大于当前长度时，新增元素填充为 `null`。
+* len 小于当前长度时，截断尾部元素。
+### Array.setItem(self, i, val)
+设置第 i 个元素为 val。
+* 索引按[下标](../值与类型.md)规则回绕，负数从末尾算起。
 ### Array.shift(self)
 删除并返回开头元素；空数组返回 null。
-### Array.splice
-	splice(self, start, deleteCount, *items)
+### Array.splice(self, start, deleteCount, *items)
 从 start 起删除 deleteCount 个元素，再在原位插入 items，返回 null。
 * start 为负时从末尾算起；deleteCount 为负按 0 处理；越界钳制。
 ### Array.toString(self)
-返回 `[a, b]` 形式的字符串，元素用 [ToString](../抽象操作.md#tostring)。对任意可迭代对象有效。
+返回 `[a, b]` 形式的字符串，元素用 [ToString](../抽象操作.md#tostring)。self 可以是任意可迭代对象。
 ### Array.unshift(self, item)
 把实参依次插到开头，返回 null。
 
@@ -162,10 +209,14 @@ Buffer 是可构造类：`Buffer(n)` 创建 n 字节的缓冲区。
 * 超出缓冲区范围时报错。
 
 ### Buffer.clear(self)
+把缓冲区所有字节置为 0。
 ### Buffer.len(self)
+缓冲区的字节长度。
 
 ## Error
 Error 是可构造类：`Error(message)` 创建错误对象。
+### Error.init(self, message='')
+设置错误对象的 `message` 属性。message 省略为空串。
 ### Error.name
 值为 `'Error'`。
 ### Error.toString(self)
@@ -174,10 +225,12 @@ Error 是可构造类：`Error(message)` 创建错误对象。
 
 
 ## Range（非全局变量）
-是一个标准可构造类。
-### Range.init(self, start, stop, step)
-设置区间的起点、终点与步长；step 省略为 1。
+是一个标准可构造类。通过 `a..b` 运算或 `Number.range(a, b, step)` 构造。
+
+实例属性：`start`、`end`、`step`（均为数字）。
+### Range.init(self, start, end, step=1)
+设置区间的起点、终点与步长。
 ### Range.next(self, i)
 迭代函数，迭代键即当前值。
 * 首次调用（key 不是数字）从 start 开始，否则为上一次的值加 step。
-* 当前值 `>= stop` 时返回 `{done=true}`；否则返回 `{done=false, key=当前值, value=当前值}`。
+* 当前值 `>= end` 时返回 `{done=true}`；否则返回 `{done=false, key=当前值, value=当前值}`。

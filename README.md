@@ -9,9 +9,9 @@ Jua 的官方实现是 [juacpp](juacpp)，目前可构建、可运行，但语�
 
 | 你是 | 先看 |
 |---|---|
-| **使用者**：想运行 Jua、写脚本 | [juacpp/README](juacpp/README.md) —— 怎么运行、REPL 怎么用、实现与规范的差异 |
-| 想查语言的准确规定 | [Jua 草案](draft/jua草案.md) |
 | 只想先感受语法 | [在线体验](https://x-ze.cn/html/jua)，或 [demo](demo) 里的脚本 |
+| 使用者：想运行 Jua、写脚本 | [juacpp/README](juacpp/README.md) —— 怎么运行、REPL 怎么用、实现与规范的差异 |
+| 想查语言的准确规定 | [Jua 草案](draft/jua草案.md) |
 | 想参与实现 | 下面的[仓库结构](#仓库结构)，实现细节见 [juacpp/README](juacpp/README.md) |
 
 ## 仓库结构

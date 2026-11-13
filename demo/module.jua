@@ -3,3 +3,13 @@ print(JSON.encode({a=1, b=['m','q']}))
 
 let {PI, cos, floor} = require 'math'
 print(PI, cos(PI), floor(1.9))
+
+// useNS：把命名空间的成员导入一个对象
+let ns = {name = 'jua', version = 0}
+let target = {}
+useNS(target, ns)
+print(target.name, target.version)
+
+// 推荐用法：导入当前作用域，相当于其它语言的 import * from 'module'
+local:useNS 'math'
+print('after local:useNS:', floor(PI), round(2.6))

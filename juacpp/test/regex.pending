@@ -1,0 +1,68 @@
+// regex 模块的预期用例（备忘，不参与测试）
+//
+// run-tests.ps1 只跑 test/*.jua，本文件没有 .jua 后缀，不会被当作测试执行。
+// regex 模块与 String 的 match/matchAll/search/replace/replaceAll/split 都还没实现；
+// 实现完成后，把本文件改名为 regex.jua，并补上边界用例（空匹配、lastIndex 回绕、
+// 捕获组未参与、sticky、标志组合）。
+//
+// 内容取自 17f47ce^:draft/builtins/regex.md 的 §6 用例。
+
+let {eq, ok} = require 'harness'
+let re = require 'regex'
+
+let pat = re`\d+`            // 无标志简写
+let patg = re(`\d+`, 'g')    // 带标志用括号
+let s = 'abc 12 def 345 ghi'
+
+// exec 迭代
+let m
+m = patg:exec(s)             // {0='12', index=4, input=s}
+m = patg:exec(s)             // {0='345', index=11}
+m = patg:exec(s)             // null
+
+patg.lastIndex = 0           // 重置
+
+// String.match：g 下返回匹配子串数组
+eq(s:match(patg):join(','), '12,345')
+
+// test：g 下推进 lastIndex
+patg.lastIndex = 0
+ok(patg:test(s))             // true，lastIndex → 6
+ok(patg:test(s))             // true，lastIndex → 14
+ok(!patg:test(s))            // false，lastIndex → 0
+
+// replace
+eq('a1b2c3':replace(re(`\d`, 'g'), 'X'), 'aXbXcX')                 // g 换全部
+eq('a1b2c3':replace(re`\d`, 'X'), 'aXb2c3')                        // 无 g 换第一个
+eq('a1b2':replace(re`(\d)`, '[$1]'), 'a[1]b[2]')                   // 捕获组引用
+eq('a1b2':replace(re`(\d)`, fun(m, g1){ return '[' + g1 + ']' }), 'a[1]b[2]')
+
+// replaceAll
+eq('a1b2c3':replaceAll('1', 'X'), 'aXb2c3')                        // 字符串换全部
+eq('a1b2c3':replaceAll(re(`\d`, 'g'), 'X'), 'aXbXcX')              // regex 须带 g
+
+// search
+eq('abc123':search(re`\d+`), 3)
+eq('abc':search(re`\d+`), -1)
+
+// split
+eq('a1b2c3':split(re`\d`), ['a', 'b', 'c', ''])
+
+// 解构 exec 结果
+let [whole, digits] = re`(\d+)`:exec('x42y')
+eq(whole, '42')
+eq(digits, '42')
+
+// 命名捕获
+let d = re`(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})`:exec('2026-11-13')
+eq(d.groups.year, '2026')
+eq(d.groups.month, '11')
+let {year, day} = d.groups
+eq(year, '2026')
+eq(day, '13')
+eq('2026-11-13':replace(d, '$<year>/$<month>'), '2026/11')         // $<name> 引用
+
+// matchAll 迭代器
+for(m in 'a1b2c3':matchAll(re(`\w(\d)`, 'g'))){
+    print(m[0], m[1])        // a1 a / b2 b / c3 c
+}

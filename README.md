@@ -3,13 +3,16 @@ Jua 是一门脚本语言。其名称的寓意是“长得像 JS 的 Lua 语言�
 
 语言定位：通用，学起来快，写起来也快。<!--运行起来就不快了-->
 
-## 了解 Jua
-* [在线体验](https://x-ze.cn/html/jua) Jua 的语法
-* 查阅[Jua 草案](draft/jua草案.md)以了解 Jua 的准确规定
-* 看 [demo](demo) 里的脚本快速感受语法
+## 从这里开始
 
-## 使用 Jua
-Jua 的官方实现是 [juacpp](juacpp)，目前可构建、可运行，但语言特性仍在补齐中。也许你需要自己实现它。
+Jua 的官方实现是 [juacpp](juacpp)，目前可构建、可运行，但语言特性仍在补齐中。
+
+| 你是 | 先看 |
+|---|---|
+| **使用者**：想运行 Jua、写脚本 | [juacpp/README](juacpp/README.md) —— 怎么运行、REPL 怎么用、实现与规范的差异 |
+| 想查语言的准确规定 | [Jua 草案](draft/jua草案.md) |
+| 只想先感受语法 | [在线体验](https://x-ze.cn/html/jua)，或 [demo](demo) 里的脚本 |
+| 想参与实现 | 下面的[仓库结构](#仓库结构)，实现细节见 [juacpp/README](juacpp/README.md) |
 
 ## 仓库结构
 

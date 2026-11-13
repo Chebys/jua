@@ -507,6 +507,75 @@ Object* VM::makeObjectProto(){
         }
         return target;
     }));
+    proto->setProp("getOwn", makeFunc([](jualist& args){
+        if(args.size() < 2) throw new JuaTypeError("Object.getOwn() requires 2 arguments");
+        auto self = args[0];
+        if(self->type != Value::Obj)
+            throw new JuaTypeError("Object.getOwn() called on a non-object");
+        auto key = args[1];
+        if(key->type != Value::Str)
+            throw new JuaTypeError("Object.getOwn() requires a string key");
+        auto value = static_cast<Object*>(self)->getOwn(key->toString());
+        if(value)return value;
+        return args.size() >= 3 ? args[2] : Null::getInst();
+    }));
+    proto->setProp("keys", makeFunc([this](jualist& args){
+        if(args.size() < 1) throw new JuaTypeError("Object.keys() requires 1 argument");
+        auto self = args[0];
+        if(self->type != Value::Obj)
+            throw new JuaTypeError("Object.keys() called on a non-object");
+        auto arr = new Array(this, {});
+        for(auto& kv: static_cast<Object*>(self)->dict)
+            arr->items.push_back(new String(this, kv.first));
+        return arr;
+    }));
+    proto->setProp("entries", makeFunc([this](jualist& args){
+        if(args.size() < 1) throw new JuaTypeError("Object.entries() requires 1 argument");
+        auto self = args[0];
+        if(self->type != Value::Obj)
+            throw new JuaTypeError("Object.entries() called on a non-object");
+        auto arr = new Array(this, {});
+        for(auto& kv: static_cast<Object*>(self)->dict){
+            auto pair = new Array(this, {});
+            pair->items.push_back(new String(this, kv.first));
+            pair->items.push_back(kv.second);
+            arr->items.push_back(pair);
+        }
+        return arr;
+    }));
+    // 每次调用建一个迭代器原型：元方法只查原型，next 必须挂在原型上
+    proto->setProp("pairs", makeFunc([this](jualist& args){
+        if(args.size() < 1) throw new JuaTypeError("Object.pairs() requires 1 argument");
+        auto self = args[0];
+        if(self->type != Value::Obj)
+            throw new JuaTypeError("Object.pairs() called on a non-object");
+        auto itProto = new Object(this);
+        itProto->setProp("next", makeFunc([this](jualist& args) -> Value* {
+            if(args.size() < 2) throw new JuaTypeError("pairs.next() requires 2 arguments");
+            auto iter = args[0];
+            if(iter->type != Value::Obj)
+                throw new JuaTypeError("pairs.next() called on a non-object");
+            auto target = static_cast<Object*>(iter)->getOwn("target");
+            if(!target || target->type != Value::Obj)
+                throw new JuaError("pairs iterator is invalid");
+            jualist nextArgs{target, args[1]};
+            auto res = obj_next->call(nextArgs);
+            auto done = res->getProp("done");
+            if(done && done->toBoolean())return res;
+            auto key = res->getProp("key");
+            auto pair = new Array(this, {});
+            pair->items.push_back(key);
+            pair->items.push_back(static_cast<Object*>(target)->getOwn(key->toString()));
+            auto out = new Object(this);
+            out->setProp("done", Boolean::getInst(false));
+            out->setProp("key", key);
+            out->setProp("value", pair);
+            return out;
+        }));
+        auto iter = new Object(this, itProto);
+        iter->setProp("target", self);
+        return iter;
+    }));
     proto->setProp("hasOwn", makeFunc([this](jualist& args){
         if(args.size() < 2) throw new JuaTypeError("Object.hasOwn() requires 2 arguments");
         auto self = args[0];

@@ -63,3 +63,39 @@ let k = Object.new(K, 7)
 eq(k.x, 7, 'Object.new calls init')
 eq(Object.getProto(k), K, 'Object.new sets the prototype')
 throws(fun(){ Object.new(1) }, 'Object.new rejects non-object prototypes')
+
+// Object.getOwn：只查自身
+let own = {a = 1}
+eq(Object.getOwn(own, 'a'), 1, 'getOwn finds own property')
+eq(Object.getOwn(own, 'zz'), null, 'getOwn missing gives null')
+eq(Object.getOwn(own, 'zz', 9), 9, 'getOwn default value')
+let ownProto = {inh = 1}
+let ownChild = {}
+Object.setProto(ownChild, ownProto)
+eq(Object.getOwn(ownChild, 'inh'), null, 'getOwn ignores inherited properties')
+eq(Object.get(ownChild, 'inh'), 1, 'Object.get sees inherited properties')
+throws(fun(){ Object.getOwn(1, 'a') }, 'getOwn rejects non-objects')
+
+// Object.keys / entries / pairs
+let kv = {a = 1, b = 2}
+let ks = Object.keys(kv)
+eq(ks:len(), 2, 'keys count')
+ok('a' in ks, 'keys contains a')
+ok('b' in ks, 'keys contains b')
+
+let es = Object.entries(kv)
+eq(es:len(), 2, 'entries count')
+eq(es[0]:len(), 2, 'entry is a key-value pair')
+let entrySum = 0
+for([k, v] in es) entrySum += v
+eq(entrySum, 3, 'entries carry values')
+
+let pairSum = 0
+let seenPairs = {}
+for([k, v] in Object.pairs(kv)){
+    pairSum += v
+    seenPairs[k] = v
+}
+eq(pairSum, 3, 'pairs yields key-value pairs')
+eq(seenPairs.a, 1, 'pairs keys match')
+eq(seenPairs.b, 2, 'pairs values match')

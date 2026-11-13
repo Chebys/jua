@@ -60,3 +60,19 @@ let blockValue = try{ return 5 }
 eq(blockValue.value, 5, 'try{ } 内的 return 成为返回的值')
 
 throws(fun(){ throw 'x' }, 'throws helper detects error')
+
+// useNS：把命名空间成员导入对象
+let ns = {a = 1, b = 2}
+let nsTarget = {}
+eq(useNS(nsTarget, ns), null, 'useNS returns null')
+eq(nsTarget.a + nsTarget.b, 3, 'useNS copies members')
+
+let imported = {}
+useNS(imported, 'math')
+ok(imported.PI > 3, 'useNS accepts a module name')
+eq(imported.floor(1.9), 1, 'imported function is callable')
+
+let emptyTarget = {}
+useNS(emptyTarget, null)
+eq(Object.hasOwn(emptyTarget, 'x'), false, 'null namespace is ignored')
+throws(fun(){ useNS(1, ns) }, 'useNS requires an object scope')

@@ -178,6 +178,20 @@ void VM::makeGlobal(){
         auto typeName = val->getTypeName();
         return new String(this, typeName);
     }));
+    // useNS(scope, ns)：把命名空间成员导入 scope（见 draft/builtins/fns.md）
+    _G->setProp("useNS", makeFunc([this](jualist& args){
+        if(args.size() < 2) throw new JuaTypeError("useNS() requires 2 arguments");
+        Value* scope = args[0];
+        if(scope->type != Value::Obj)
+            throw new JuaTypeError("useNS() requires an object scope");
+        Value* ns = args[1];
+        if(ns->type == Value::Str) ns = require(ns->toString());
+        auto assign = ObjectProto->getOwn("assign");
+        if(!assign || assign->type != Value::Func)
+            throw new JuaError("internal: Object.assign is missing");
+        static_cast<Function*>(assign)->call({scope, ns});
+        return Null::getInst();
+    }));
 }
 Value* VM::require(const string& name){
     if(modules.contains(name))return modules[name];

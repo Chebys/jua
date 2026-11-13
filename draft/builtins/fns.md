@@ -55,3 +55,17 @@
 返回代表值类型的字符串。可能为 "null", "number", "string", "boolean", "object", "function"。
 
 ## useNS
+	useNS(scope, ns)
+把命名空间的成员导入 scope，返回 null。
+
+* `ns` 为字符串时，先对它调用 [require](#require)；否则直接使用。
+* `scope` 必须是对象，否则报 type 错误。
+* 等价于：
+
+	fun useNS(scope, ns){
+		if(type(ns) == 'string')
+			ns = require(ns)
+		Object.assign(scope, ns)
+	}
+
+* 因此导入的规则与 [Object.assign](classes.md#objectassigntarget-sources) 一致：只复制自身属性，后者覆盖前者，null 命名空间被忽略。

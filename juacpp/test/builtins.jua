@@ -76,3 +76,7 @@ let emptyTarget = {}
 useNS(emptyTarget, null)
 eq(Object.hasOwn(emptyTarget, 'x'), false, 'null namespace is ignored')
 throws(fun(){ useNS(1, ns) }, 'useNS requires an object scope')
+
+// 推荐用法：local:useNS 'module'，相当于 import * from 'module'
+local:useNS 'json'
+eq(encode({a = 1}), '{"a":1}', 'local:useNS imports into the current scope')

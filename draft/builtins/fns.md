@@ -69,3 +69,8 @@
 	}
 
 * 因此导入的规则与 [Object.assign](classes.md#objectassigntarget-sources) 一致：只复制自身属性，后者覆盖前者，null 命名空间被忽略。
+* 推荐用法是把它作用在 `local` 上：
+
+	local:useNS 'module'
+
+  相当于其它语言的 `import * from 'module'`：把模块成员导入当前作用域。`local` 在表达式位置表示当前作用域，见[关键字表达式](../表达式.md#关键字表达式)。

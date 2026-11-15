@@ -35,10 +35,16 @@ print(d['apple'], d['banana'], d['meat'])
 // 数字键要编码成字节串；这类键不适合当属性名，放进独立的 _ 里，
 // 顺便也就不会被写入遮蔽类方法。
 let NumberCounter = class({
-	init(self, list = []){
+	init(self, data = null){
 		self._ = {}
-		for(n in list)
-			self[n] += 1
+		if(data is Array){
+			for(n in data)
+				self[n] += 1
+		}else if(type(data) == 'object'){
+			// 形如 toJSON 的返回值：键是数字的字符串形式，值是计数
+			for([key, count] in Object.pairs(data))
+				self[Number(key)] = count
+		}
 	},
 	getItem(self, n){
 		return Object.getOwn(self._, Number.encodeFloat64(n), 0)
@@ -74,4 +80,11 @@ print(nc[1], nc[3], nc[5], nc[7])
 print('pairs  :', nc:pairs():len())
 print('string :', String(nc))
 print('print  :', nc)
-print('json   :', (require 'json').encode(nc))
+
+let json = require 'json'
+print('json   :', json.encode(nc))
+
+// init 也接受 toJSON 形状的对象，于是可以往返
+let nc2 = NumberCounter(json.decode(json.encode(nc)))
+print('round  :', String(nc2))
+print('相等   :', nc2[3] == nc[3], nc2[7] == nc[7])

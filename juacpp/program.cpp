@@ -337,8 +337,10 @@ void ForStmt::exec(Scope* env, Controller* controller){
         Value* value = it->next();
         if(!value)break;
         env->vm->gcRoots.push_back(value);
-        declarable->declare(env, value);
-        body->exec(new Scope(env), controller);
+        //每个循环节一份独立绑定：闭包各自捕获本轮的值，不会共享同一个变量
+        auto iterEnv = new Scope(env);
+        declarable->declare(iterEnv, value);
+        body->exec(new Scope(iterEnv), controller);
         controller->continuing = false;
         if(controller->isPending()){
             controller->breaking = false;

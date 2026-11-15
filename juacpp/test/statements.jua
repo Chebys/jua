@@ -1,5 +1,5 @@
 // 语句：if/while/for/switch 与 break/continue/return
-let {eq} = require 'harness'
+let {eq, ok} = require 'harness'
 
 // 解构数组
 let [dx, dy] = [3, 4]
@@ -29,6 +29,27 @@ eq(sum, 1 + 2 + 4 + 5, 'while with break and continue')
 let r = 0
 for(k in 1..5) r += k
 eq(r, 10, 'for over range is end-exclusive')
+
+// 每个循环节独立绑定：闭包各自捕获本轮的值
+let caps = []
+for(v in [1, 2, 3]){
+    caps:push(fun(){ return v })
+}
+eq(caps[0](), 1, 'closure keeps its own iteration value')
+eq(caps[1](), 2, 'second iteration keeps its value')
+eq(caps[2](), 3, 'third iteration keeps its value')
+
+// 循环变量不泄漏到循环之外
+let leaked = try{ return v }
+eq(leaked.status, false, 'loop variable is not visible after the loop')
+
+// 解构同样按轮独立
+let pairCaps = []
+for([pk, pv] in Object.pairs({a = 1, b = 2})){
+    pairCaps:push(fun(){ return pk })
+}
+ok((pairCaps[0]() == 'a' && pairCaps[1]() == 'b') ||
+   (pairCaps[0]() == 'b' && pairCaps[1]() == 'a'), 'destructured loop vars are per-iteration')
 
 fun sw(n){
     switch(n)

@@ -1,0 +1,64 @@
+let StructBuilder = {}
+let TYPES = ['uint8', 'uint16', 'uint32', 'int8', 'int16', 'int32', 'float32', 'float64']
+let encoder = {}, decoder = {}
+for(type in TYPES){
+	let capitalized = type[0]:upper() + type:slice(1)
+	encoder[type] = Number['encode'+capitalized]
+	decoder[type] = Number['decode'+capitalized]
+	let len = encoder[type](0):len()
+	StructBuilder[type] = fun(self, name){
+		let member = {
+			name,
+			type,
+			len,
+			offset = self.offset
+		}
+		self.members:push(member)
+		self.memberMap[name] = member
+		self.offset += len
+	}
+}
+
+fun Struct(ctor){
+	let builder = {
+		offset = 0,
+		members = [],
+		memberMap = {}
+	}
+	Object.setProto(builder, StructBuilder)
+	ctor(builder)
+	return class({
+		init(self, list){
+			self.buffer = Buffer(builder.offset)
+			for(i in 0 .. list:len()){
+				let {type, offset} = builder.members[i]
+				let v = list[i]
+				let bytes = encoder[type](v)
+				self.buffer:write(bytes, offset)
+			}
+		},
+		getItem(self, key){
+			if(type(key) == 'string'){
+				let {type, len, offset} = builder.memberMap[key]
+				let bytes = self.buffer:read(offset, offset+len)
+				return decoder[type](bytes)
+			}else{
+				throw 'invalid key'
+			}
+		}
+	})
+}
+
+let Data = Struct(i){
+	i:uint8 'version'
+	i:uint32 'size'
+	i:float64 'height'
+	i:int32 'offset'
+}
+
+let data1 = Data([3, -1, 1234.567, -100])
+
+print("version: ${data1['version']}
+size: ${data1['size']}
+height: ${data1['height']}
+offset: ${data1['offset']}")

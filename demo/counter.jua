@@ -1,27 +1,22 @@
 // 用 getItem / setItem 元方法实现「缺失即 0」的计数器。
 //
-// 计数存在独立的 _ 里，而不是实例自身：
-//   * getItem 若用 Object.get（含继承），键与方法同名时会把方法当成计数
-//     （c['getItem'] 会返回函数，c['init'] + 1 直接报 type 错）；
-//   * 计数写进自身属性又会让数据和类方法共用一个命名空间。
-// 所以这里用 Object.getOwn 只查计数表，setItem 也只写计数表。
+// 方法定义在原型上，实例自身只存计数。因此 getItem 用 Object.getOwn 就够了：
+// 读的是「自己的计数，没有就是 0」，键即使叫 getItem / init 也不会撞上方法。
+//
+// 代价：写一个与方法同名的键会遮蔽方法（c['init'] = 1 之后 c:init() 就用不了）。
+// 需要这层保护时，把计数放进独立的对象里，见下面的 NumberCounter。
 
 let Counter = class({
 	init(self, data = null){
-		self._ = {}
 		if(data is Array){
 			for(item in data)
 				self[item] += 1
 		}else if(type(data) == 'object'){
-			for([key, value] in Object.pairs(data))
-				self[key] = value
+			Object.assign(self, data)
 		}
 	},
 	getItem(self, key){
-		return Object.getOwn(self._, key, 0)
-	},
-	setItem(self, key, val){
-		self._[key] = val
+		return Object.getOwn(self, key, 0)
 	}
 })
 
@@ -31,13 +26,14 @@ c['banana'] += 2
 c['apple'] += 3
 print(c['apple'], c['banana'], c['meat'])
 
+// 与方法同名的键也是普通计数：读到 0，而不是方法
+print(c['getItem'], c['init'])
+
 let d = Counter({apple = 5, banana = 7})
 print(d['apple'], d['banana'], d['meat'])
 
-// 与类方法同名的键也是普通计数：读不到就是 0，不会撞上方法
-print(d['getItem'], d['init'])
-
-// 数字键：编码成字节串当作计数表的键
+// 数字键要编码成字节串；这类键不适合当属性名，放进独立的 _ 里，
+// 顺便也就不会被写入遮蔽类方法。
 let NumberCounter = class({
 	init(self, list = []){
 		self._ = {}
@@ -45,8 +41,7 @@ let NumberCounter = class({
 			self[n] += 1
 	},
 	getItem(self, n){
-		let key = Number.encodeFloat64(n)
-		return Object.getOwn(self._, key, 0)
+		return Object.getOwn(self._, Number.encodeFloat64(n), 0)
 	},
 	setItem(self, n, val){
 		self._[Number.encodeFloat64(n)] = val
